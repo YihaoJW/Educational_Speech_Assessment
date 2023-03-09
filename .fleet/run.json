@@ -1,5 +1,9 @@
 {
     "configurations": [
-        
+        {
+            "name": "Rest_Script",
+            "type": "command",
+            "program": "python3"
+        }
     ]
 }

@@ -217,3 +217,10 @@ class AsrLcss:
         if self.__result is not None:
             print("Result:\n\t {}\n".format(self.__result))
         print("")
+
+
+if __name__ == '__main__':
+    print('Script running')
+    import sys
+
+    print(sys.version)
