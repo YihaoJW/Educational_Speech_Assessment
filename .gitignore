@@ -2,10 +2,10 @@
 # Xcode
 #
 # gitignore contributors: remember to update Global/Xcode.gitignore, Objective-C.gitignore & Swift.gitignore
-
+## JetBrain Configure
+/.idea
 ## User settings
 xcuserdata/
-DataFolder/
 
 ## compatibility with Xcode 8 and earlier (ignoring not required starting Xcode 9)
 *.xcscmblueprint
