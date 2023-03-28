@@ -311,3 +311,5 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
+/correct_rate_original_c_w_p_m.eps
+/.fleet/settings.json

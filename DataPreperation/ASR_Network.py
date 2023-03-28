@@ -81,6 +81,31 @@ def build_network(input_shape, output_shape, channels_list, filter_size, stack_s
 
 
 # %%
+# Define a residual block that use fully connected layer
+def residual_block_fc(x, channels):
+    x_input = x
+    # Residual block start Normalize, Activate, and Convolution
+    x = tf.keras.layers.LayerNormalization()(x)
+    x = tf.keras.layers.Activation('relu')(x)
+    x = tf.keras.layers.Dense(channels)(x)
+
+    x = tf.keras.layers.LayerNormalization()(x)
+    x = tf.keras.layers.Activation('relu')(x)
+    x = tf.keras.layers.Dense(channels)(x)
+
+    return tf.keras.layers.Add()([x_input, x])
+
+
+# %%
+# Build a stack for fully connected layer
+def residual_block_stack_fc(x, channels, stack_size):
+    x = tf.keras.layers.Dense(channels)(x)
+    for i in range(stack_size):
+        x = residual_block_fc(x, channels)
+    return x
+
+
+# %%
 # Create a dense residual network
 def build_dense_network(input_shape, output_shape, channels_list, filter_size, stack_size):
     x = tf.keras.Input(input_shape)
@@ -131,6 +156,8 @@ class InformPooling(tf.keras.layers.Layer):
         pooled_value = [self.inform_pooling(value, start, duration, ratio) for (value, ratio) in
                         zip(value_list, self.ratios_list)]
         ret = tf.concat([val for val, _ in pooled_value], axis=-1)
+        # Remove nan value to zero
+        ret = tf.where(tf.math.is_nan(ret), 0., ret)
         # Stupid way to shrink dynamic shape to static shape
         return tf.RaggedTensor.from_row_lengths(ret, pooled_value[0][1])
 
@@ -148,7 +175,7 @@ class ASR_Network(tf.keras.Model):
         self.train_word_loss = tf.keras.metrics.Mean(name='train_word_loss')
         self.train_deep_loss = tf.keras.metrics.Mean(name='train_deep_loss')
         # define loss
-        self.category_loss = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
+        self.category_loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
 
     @staticmethod
     def create_base_network(input_shape, feature_depth, channels_list, filter_size, stack_size):
@@ -157,13 +184,12 @@ class ASR_Network(tf.keras.Model):
         return tf.keras.Model(x, [y, maps])
 
     @staticmethod
-    def build_dense_network(input_shape, output_shape, channels_list, filter_size, stack_size):
+    def build_dense_network(input_shape, output_shape, channels_list, stack_size):
         x = tf.keras.Input(input_shape)
-        y = residual_block_stack(x, channels_list[0], filter_size, stack_size)
-        for i in range(1, len(channels_list)):
-            y = tf.keras.layers.Concatenate(axis=-1)([y, x])
-            y = residual_block_stack(y, channels_list[i], filter_size, stack_size)
-        y = tf.keras.layers.Conv1D(output_shape, 1, padding='same')(y)
+        y = x
+        for i in range(len(channels_list)):
+            y = residual_block_stack_fc(y, channels_list[i], stack_size)
+        y = tf.keras.layers.Dense(output_shape)(y)
         return tf.keras.Model(x, y)
 
     @staticmethod
@@ -214,7 +240,7 @@ class ASR_Network(tf.keras.Model):
         total_loss = tf.reduce_sum(loss_array.stack())
         return total_loss
 
-    def call(self, inputs, training=None, mask=None):
+    def call(self, inputs, training=False, mask=None):
         audio, (start, duration) = inputs
         # compute the base network
         base_output, maps = self.base_network(audio, training=training)
@@ -229,15 +255,15 @@ class ASR_Network(tf.keras.Model):
         return word_prediction, deep_feature
 
     # compute a input pair
-    def compute_pair(self, inputs, training=None, mask=None):
+    def compute_pair(self, inputs, training=False, mask=None):
         student, reference = inputs
         # compute both student and reference
-        student_output, student_deep_feature = self(student, training=training)
-        reference_output, reference_deep_feature = self(reference, training=training)
+        student_output, student_deep_feature = self(student, training=training, mask=mask)
+        reference_output, reference_deep_feature = self(reference, training=training, mask=mask)
         return (student_output, student_deep_feature), (reference_output, reference_deep_feature)
 
     # get loss for an input pair
-    def compute_loss_pair(self, inputs, word_reference, training=None, mask=None):
+    def compute_loss_pair(self, inputs, word_reference):
         (student_output, student_deep_feature), (reference_output, reference_deep_feature) = inputs
         # compute the loss for word prediction
         word_loss_student = self.category_loss(word_reference, student_output)
@@ -254,8 +280,8 @@ class ASR_Network(tf.keras.Model):
         # compute the loss for each pair
         with tf.GradientTape() as tape:
             # compute the loss for each pair
-            pair_data = self.compute_pair(x)
-            avg_word_loss, deep_loss = self.compute_loss_pair(pair_data, word_reference, training=True)
+            pair_data = self.compute_pair(x, training=True)
+            avg_word_loss, deep_loss = self.compute_loss_pair(pair_data, word_reference)
             # compute the total loss
             total_loss = avg_word_loss + deep_loss
         # compute the gradient
