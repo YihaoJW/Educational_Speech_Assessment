@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Callable, Tuple, Dict
+from typing import Callable, Tuple, Dict, Optional
 import tensorflow as tf
 from tensorflow import Tensor
 
@@ -17,7 +17,7 @@ class DataPipeFactory:
         if not self.word_information_path.exists():
             raise FileNotFoundError(f"word_information_path {word_information_path} not found")
         self.__cache = str(cache)
-        self.__pairs: tf.int32 = 2
+        self.__pairs: tf.int32 = 1
         self.__available_voice = 4
         self.__mel_bins = 80
         self.__raw_data: tf.data.Dataset = self.__generate_raw_data()
@@ -168,6 +168,27 @@ class DataPipeFactory:
         sample_dict['counter_pool_index'] = counter_word_index
         return sample_dict
 
+    @staticmethod
+    def __single_mapping(main: dict[str, tf.Tensor]) -> dict[str, tf.Tensor]:
+        sample_dict = {}
+        random_ref_voice_id = tf.random.uniform(shape=[], minval=0, maxval=tf.shape(main['ref_mfcc'])[0],
+                                                dtype=tf.int32)
+        sample_dict['stu_mfcc'] = main['stu_mfcc']
+        sample_dict['ref_mfcc'] = main['ref_mfcc'][random_ref_voice_id]
+        sample_dict['valid_stu_start'] = main['valid_stu_start'][random_ref_voice_id]
+        sample_dict['valid_stu_duration'] = main['valid_stu_duration'][random_ref_voice_id]
+        sample_dict['valid_ref_word'] = main['valid_ref_word'][random_ref_voice_id]
+        sample_dict['valid_ref_start'] = main['valid_ref_start'][random_ref_voice_id]
+        sample_dict['valid_ref_duration'] = main['valid_ref_duration'][random_ref_voice_id]
+
+        # Sample same mount of period from counter that match the main
+        # Get the range of word under main
+        main_word_range = tf.shape(sample_dict['valid_ref_word'])
+        # Sample same mount of period from counter that match the main Generate same amount of random integer match
+        # up the range of main_word_range counter_word_index = tf.random.uniform(shape=main_word_range, minval=0,
+        # maxval=tf.shape(counter['valid_ref_word'][counter_random_ref_voice_id])[0], dtype=tf.int32)
+        return sample_dict
+
     def pre_save(self) -> None:
         self.__raw_data.save(self.__cache, compression='GZIP')
         self.__cache_status = True
@@ -197,18 +218,25 @@ class DataPipeFactory:
     def __pair_map_handle(self, pairs: int,
                           deterministic: bool = True) \
             -> Callable[[tf.data.Dataset], tf.data.Dataset]:
-        def handle(ds):
-            tuple_of_pairs = tuple(ds.shuffle(20, reshuffle_each_iteration=True) for _ in range(pairs))
-            comb_data = tf.data.Dataset.zip(tuple_of_pairs).filter(lambda x, y: x["RecordName"] != y["RecordName"])
-            return comb_data.map(self.__pair_mapping, num_parallel_calls=tf.data.AUTOTUNE,
-                                 deterministic=deterministic) \
-                .shuffle(buffer_size=10, reshuffle_each_iteration=True)
+        if pairs == 1:
+            def handle(ds):
+                return ds.map(self.__single_mapping, num_parallel_calls=tf.data.AUTOTUNE, deterministic=deterministic) \
+                    .shuffle(buffer_size=10, reshuffle_each_iteration=True)
+            pass
+        else:
+            def handle(ds):
+                tuple_of_pairs = tuple(ds.shuffle(20, reshuffle_each_iteration=True) for _ in range(pairs))
+                comb_data = tf.data.Dataset.zip(tuple_of_pairs).filter(lambda x, y: x["RecordName"] != y["RecordName"])
+                return comb_data.map(self.__pair_mapping, num_parallel_calls=tf.data.AUTOTUNE,
+                                     deterministic=deterministic) \
+                    .shuffle(buffer_size=10, reshuffle_each_iteration=True)
 
         return handle
 
     def k_fold(self, total_fold: int,
                fold_index: int,
                batch_size: int,
+               addition_map: Optional[Callable[[tf.data.Dataset], tf.data.Dataset]] = None,
                deterministic: bool = False) \
             -> Tuple[tf.data.Dataset, tf.data.Dataset]:
         if fold_index >= total_fold:
@@ -225,10 +253,19 @@ class DataPipeFactory:
             .map(lambda _, data: data, num_parallel_calls=tf.data.AUTOTUNE, deterministic=deterministic) \
             .apply(self.__pair_map_handle(self.__pairs, deterministic=deterministic)) \
             .apply(self.__batching_handle(batch_size))
+        if addition_map is not None:
+            train_data = train_data.map(addition_map, num_parallel_calls=tf.data.AUTOTUNE, deterministic=deterministic).prefetch(tf.data.AUTOTUNE)
+            test_data = test_data.map(addition_map, num_parallel_calls=tf.data.AUTOTUNE, deterministic=deterministic).prefetch(tf.data.AUTOTUNE)
         return train_data, test_data
 
     def get_batch_data(self,
                        batch_size: int,
+                       addition_map: Optional[Callable[[tf.data.Dataset], tf.data.Dataset]] = None,
                        deterministic=False) -> tf.data.Dataset:
-        return self.get_raw_data().apply(self.__pair_map_handle(self.__pairs, deterministic=deterministic)).apply(
-            self.__batching_handle(batch_size))
+        if addition_map is not None:
+            return self.get_raw_data().apply(self.__pair_map_handle(self.__pairs, deterministic=deterministic)).apply(
+                self.__batching_handle(batch_size)) \
+                .map(addition_map, num_parallel_calls=tf.data.AUTOTUNE, deterministic=deterministic).prefetch(tf.data.AUTOTUNE)
+        else:
+            return self.get_raw_data().apply(self.__pair_map_handle(self.__pairs, deterministic=deterministic)).apply(
+                self.__batching_handle(batch_size))

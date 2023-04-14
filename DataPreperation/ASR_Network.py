@@ -122,8 +122,14 @@ def build_dense_network(input_shape, output_shape, channels_list, filter_size, s
 class InformPooling(tf.keras.layers.Layer):
     def __init__(self, num_maps, ratios_list, **kwargs):
         super().__init__(**kwargs)
+        self.num_maps_shape = None
         self.num_maps = num_maps
         self.ratios_list = ratios_list
+
+    def build(self, input_shape):
+        # Input is a bunch of tensor, calcuate the total number of feature maps
+        self.num_maps_shape = sum([x[-1] for x in input_shape])
+        super().build(input_shape)
 
     @staticmethod
     @tf.function
@@ -159,7 +165,9 @@ class InformPooling(tf.keras.layers.Layer):
         # Remove nan value to zero
         ret = tf.where(tf.math.is_nan(ret), 0., ret)
         # Stupid way to shrink dynamic shape to static shape
-        return tf.RaggedTensor.from_row_lengths(ret, pooled_value[0][1])
+        ret.set_shape([None, self.num_maps_shape])
+        ret = tf.RaggedTensor.from_row_lengths(ret, pooled_value[0][1])
+        return ret
 
 
 # %%
@@ -240,6 +248,7 @@ class ASR_Network(tf.keras.Model):
         total_loss = tf.reduce_sum(loss_array.stack())
         return total_loss
 
+    #    @tf.function
     def call(self, inputs, training=False, mask=None):
         audio, (start, duration) = inputs
         # compute the base network
