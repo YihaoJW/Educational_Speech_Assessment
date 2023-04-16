@@ -201,7 +201,55 @@ class ASR_Network(tf.keras.Model):
         y = tf.keras.layers.Dense(output_shape)(y)
         return tf.keras.Model(x, y)
 
+    # @staticmethod
+    # @tf.function
+    # def compute_similarity(value_a, value_b, ref_a, ref_b, margin=0.25, eps=0.001):
+    #     # if ref_a equal ref_b then we consider it should be similar else it should be different,
+    #     # margin prevent it been push to far away
+    #     # compute the norm for ragged tensor
+    #     norm_of_a = tf.sqrt(tf.reduce_sum(tf.square(value_a), axis=-1, keepdims=True))
+    #     norm_of_b = tf.sqrt(tf.reduce_sum(tf.square(value_b), axis=-1, keepdims=True))
+    #     norm_a = value_a / (norm_of_a + eps)
+    #     norm_b = value_b / (norm_of_b + eps)
+    #     # compute cosine similarity for each sample in batch
+    #     # get batch size
+    #     batch_size = tf.shape(norm_a)[0]
+    #     loss_array = tf.TensorArray(tf.float32, batch_size, infer_shape=False)
+    #     for idx in tf.range(batch_size):
+    #         va = norm_a[idx]
+    #         vb = norm_b[idx]
+    #         ra = ref_a[idx]
+    #         rb = ref_b[idx]
+    #         similarity_matrix = tf.matmul(va, vb, transpose_b=True)
+    #         # compute the mask for the positive samples
+    #         mask = tf.cast(tf.equal(ra, rb), tf.float32)
+    #         # compute the mask for the negative samples
+    #         mask_neg = tf.cast(tf.not_equal(ra, rb), tf.float32)
+    #         # compute the number of positive and negative samples
+    #         num_pos = tf.cast(tf.reduce_sum(mask), tf.float32)
+    #         num_neg = tf.cast(tf.reduce_sum(mask_neg), tf.float32)
+    #         # compute the average similarity for the positive samples
+    #         # avoid 0
+    #         num_pos = tf.maximum(num_pos, 1.)
+    #         num_neg = tf.maximum(num_neg, 1.)
+    #         avg_sim_pos = tf.reduce_sum(tf.multiply(similarity_matrix, mask)) / num_pos
+    #         # compute the average similarity for the negative samples
+    #         avg_sim_neg = tf.reduce_sum(tf.multiply(similarity_matrix, mask_neg)) / num_neg
+    #         # compute the max similarity for the positive samples
+    #         max_sim_pos = tf.reduce_max(tf.multiply(similarity_matrix, mask))
+    #         # compute the min similarity for the negative samples
+    #         min_sim_neg = tf.reduce_min(tf.multiply(similarity_matrix, mask_neg))
+    #         # compute the average loss with margin
+    #         loss_avg = tf.maximum(0., margin + avg_sim_pos - avg_sim_neg)
+    #         # compute min_max loss with margin
+    #         loss_min_max = tf.maximum(0., margin + max_sim_pos - min_sim_neg)
+    #         # total loss
+    #         loss = loss_avg + loss_min_max
+    #         loss_array = loss_array.write(idx, loss)
+    #     total_loss = tf.reduce_sum(loss_array.stack())
+    #     return total_loss
     @staticmethod
+    @tf.function
     def compute_similarity(value_a, value_b, ref_a, ref_b, margin=0.25, eps=0.001):
         # if ref_a equal ref_b then we consider it should be similar else it should be different,
         # margin prevent it been push to far away
@@ -213,8 +261,8 @@ class ASR_Network(tf.keras.Model):
         # compute cosine similarity for each sample in batch
         # get batch size
         batch_size = tf.shape(norm_a)[0]
-        loss_array = tf.TensorArray(tf.float32, batch_size, infer_shape=False)
-        for idx in tf.range(batch_size):
+
+        def loop_body(idx):
             va = norm_a[idx]
             vb = norm_b[idx]
             ra = ref_a[idx]
@@ -225,12 +273,9 @@ class ASR_Network(tf.keras.Model):
             # compute the mask for the negative samples
             mask_neg = tf.cast(tf.not_equal(ra, rb), tf.float32)
             # compute the number of positive and negative samples
-            num_pos = tf.cast(tf.reduce_sum(mask), tf.float32)
-            num_neg = tf.cast(tf.reduce_sum(mask_neg), tf.float32)
+            num_pos = tf.maximum(tf.reduce_sum(mask), 1.)
+            num_neg = tf.maximum(tf.reduce_sum(mask_neg), 1.)
             # compute the average similarity for the positive samples
-            # avoid 0
-            num_pos = tf.maximum(num_pos, 1.)
-            num_neg = tf.maximum(num_neg, 1.)
             avg_sim_pos = tf.reduce_sum(tf.multiply(similarity_matrix, mask)) / num_pos
             # compute the average similarity for the negative samples
             avg_sim_neg = tf.reduce_sum(tf.multiply(similarity_matrix, mask_neg)) / num_neg
@@ -244,8 +289,10 @@ class ASR_Network(tf.keras.Model):
             loss_min_max = tf.maximum(0., margin + max_sim_pos - min_sim_neg)
             # total loss
             loss = loss_avg + loss_min_max
-            loss_array = loss_array.write(idx, loss)
-        total_loss = tf.reduce_sum(loss_array.stack())
+            return loss
+
+        loss_array = tf.map_fn(loop_body, tf.range(batch_size), dtype=tf.float32)
+        total_loss = tf.reduce_sum(loss_array)
         return total_loss
 
     #    @tf.function
