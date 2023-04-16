@@ -53,7 +53,7 @@ class DataPipeFactory:
         e['passage_id'] = tf.strings.as_string(passage_id)
         return e
 
-    def __first_map_builder(self) -> Callable[[dict[str, Tensor]], dict[str, Tensor]]:
+    def __first_map_builder(self):
         get_mfcc = self.get_mfcc
         ref_audio_path = str(self.ref_audio_path.absolute())
         word_information_path = str(self.word_information_path.absolute())
