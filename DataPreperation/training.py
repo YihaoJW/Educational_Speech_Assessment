@@ -82,9 +82,11 @@ if __name__ == '__main__':
     with open(args.config, 'r') as f:
         config = safe_load(f)
     path_resolve(config)
+    print("manual debug: config loaded")
     # covert all path to string and create the data pipe sample if DataPipeFactory is a class
     data_pipe = DataPipeFactory(config['data_location']['data_record'], config['data_location']['siri_voice'],
                                 config['data_location']['siri_meta'], config['cache_location']['cache'])
+    print("manual debug: data pipe created")
     # map the data_pipe
     # save the data cache if cache folder is empty
     if not config['cache_location']['cache'].exists():
@@ -94,6 +96,7 @@ if __name__ == '__main__':
     data_pipe.get_raw_data()
     # create the network
     network = ASR_Network(**config['model_setting'])
+    print("manual debug: network created")
     # create learning rate scheduler
     lr_config = config['training_setting']['learning_rate']
     learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(lr_config['initial'],
@@ -112,12 +115,14 @@ if __name__ == '__main__':
     backup_callback = tf.keras.callbacks.BackupAndRestore(backup_dir=callback_config['model_restore'])
     # train the model
     network.compile(optimizer=optimizer)
+    print("manual debug: network compiled")
     train_config = config['training_setting']
     # set datapipe to final state
     dst_train, dst_test = data_pipe.k_fold(total_fold=5,
                                            fold_index=0,
                                            batch_size=train_config['batch_size'],
                                            addition_map=unpack)
+    print("manual debug: data pipe set, about to train")
     network.fit(dst_train,
                 epochs=train_config['epoch'],
                 validation_data=dst_test,

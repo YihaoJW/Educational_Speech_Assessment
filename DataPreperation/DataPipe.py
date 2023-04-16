@@ -214,7 +214,7 @@ class DataPipeFactory:
     # if cache loaded do not load again
     # if cache not loaded, load it
     def get_raw_data(self) -> tf.data.Dataset:
-        if  not self.__cache_status and Path(self.__cache).exists():
+        if not self.__cache_status and Path(self.__cache).exists():
             print(f'Load cache from {self.__cache}')
             self.__raw_data = tf.data.Dataset.load(self.__cache, compression='GZIP')
             self.__cache_status = True
