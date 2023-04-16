@@ -24,7 +24,7 @@ class DataPipeFactory:
 
     # create the parser function to parse the serialized generated above
     @staticmethod
-    def parse_function(serialized_example: tf.string) -> Dict[str, tf.Tensor]:
+    def parse_function(serialized_example: tf.string) -> Dict:
         # Define a dict with the data-names and types we expect to find in the
         # serialized example.
         features = {
@@ -53,13 +53,13 @@ class DataPipeFactory:
         e['passage_id'] = tf.strings.as_string(passage_id)
         return e
 
-    def __first_map_builder(self):
+    def __first_map_builder(self) -> Callable:
         get_mfcc = self.get_mfcc
         ref_audio_path = str(self.ref_audio_path.absolute())
         word_information_path = str(self.word_information_path.absolute())
         available_voice = self.__available_voice
 
-        def created_map(e: Dict[str, tf.Tensor]) -> Dict[str, tf.Tensor]:
+        def created_map(e: Dict) -> Dict:
             a = {'stu_mfcc': get_mfcc(e['AudioSegment'], e['SampleRate'])}
             ref_audio = tf.io.parse_tensor(tf.io.read_file(ref_audio_path + '/' + e['passage_id'] + '.tfs'),
                                            out_type=tf.int16)
@@ -120,7 +120,7 @@ class DataPipeFactory:
         return log_mel_spectrograms
 
     @staticmethod
-    def __pair_mapping(main: dict[str, tf.Tensor], counter: dict[str, tf.Tensor]) -> dict[str, tf.Tensor]:
+    def __pair_mapping(main: dict, counter: dict) -> dict:
         sample_dict = {}
         random_ref_voice_id = tf.random.uniform(shape=[], minval=0, maxval=tf.shape(counter['ref_mfcc'])[0],
                                                 dtype=tf.int32)
@@ -169,7 +169,7 @@ class DataPipeFactory:
         return sample_dict
 
     @staticmethod
-    def __single_mapping(main: dict[str, tf.Tensor]) -> dict[str, tf.Tensor]:
+    def __single_mapping(main: dict) -> dict:
         sample_dict = {}
         random_ref_voice_id = tf.random.uniform(shape=[], minval=0, maxval=tf.shape(main['ref_mfcc'])[0],
                                                 dtype=tf.int32)
@@ -254,7 +254,7 @@ class DataPipeFactory:
     def k_fold(self, total_fold: int,
                fold_index: int,
                batch_size: int,
-               addition_map: Optional[Callable[[Dict], Tuple]] = None,
+               addition_map: Optional = None,
                deterministic: bool = False) \
             -> Tuple[tf.data.Dataset, tf.data.Dataset]:
         if fold_index >= total_fold:
@@ -278,7 +278,7 @@ class DataPipeFactory:
 
     def get_batch_data(self,
                        batch_size: int,
-                       addition_map: Optional[Callable[[Dict], Tuple]] = None,
+                       addition_map: Optional = None,
                        deterministic=False) -> tf.data.Dataset:
         if addition_map is not None:
             return self.get_raw_data().apply(self.__pair_map_handle(self.__pairs, deterministic=deterministic)).apply(
