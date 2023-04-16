@@ -1,4 +1,3 @@
-# %%
 import tensorflow as tf
 import tensorflow_addons as tfa
 import numpy as np
@@ -9,8 +8,6 @@ from typing import Callable, List, Tuple, Union, Optional, Dict, Any, Sequence, 
 from DataPipe import DataPipeFactory
 from util_function import inform_pooling, GatedXVector, PositionEncoding1D
 
-
-# %%
 
 # A function that generate a residual Block using separable convolution
 def residual_block(x, channels, filter_size):
@@ -35,7 +32,6 @@ def residual_block_stack(x, channels, filter_size, stack_size):
     return x
 
 
-# %%
 # Define a Concatenate layer that will cut the input to the same length
 class CutConcatenate(tf.keras.layers.Concatenate):
     def call(self, inputs):
@@ -49,7 +45,6 @@ class CutConcatenate(tf.keras.layers.Concatenate):
         return super().call(inter)
 
 
-# %%
 # Function build a U-Net
 def build_unet(x, output_shape, channels_list, filter_size, stack_size):
     # Build the encoder
@@ -72,7 +67,6 @@ def build_unet(x, output_shape, channels_list, filter_size, stack_size):
     return x, decoder
 
 
-# %%
 # Build a Network
 def build_network(input_shape, output_shape, channels_list, filter_size, stack_size):
     x = tf.keras.Input(input_shape)
@@ -80,20 +74,20 @@ def build_network(input_shape, output_shape, channels_list, filter_size, stack_s
     return tf.keras.Model(x, y)
 
 
-# %%
 # Define a residual block that use fully connected layer
 def residual_block_fc(x, channels):
     x_input = x
     # Residual block start Normalize, Activate, and Convolution
-    x = RaggedBatchNormalization()(x)
+    x = tf.keras.layers.BatchNormalization()(x)
     x = tf.keras.layers.Activation('relu')(x)
     x = tf.keras.layers.Dense(channels)(x)
 
-    x = RaggedBatchNormalization()(x)
+    x = tf.keras.layers.BatchNormalization()(x)
     x = tf.keras.layers.Activation('relu')(x)
     x = tf.keras.layers.Dense(channels)(x)
 
     return tf.keras.layers.Add()([x_input, x])
+
 
 # %%
 # Build a stack for fully connected layer
@@ -116,7 +110,6 @@ def build_dense_network(input_shape, output_shape, channels_list, filter_size, s
     return tf.keras.Model(x, y)
 
 
-# %%
 # Define a Keras layers that perform information pooling
 class InformPooling(tf.keras.layers.Layer):
     def __init__(self, num_maps, ratios_list, **kwargs):
@@ -169,25 +162,6 @@ class InformPooling(tf.keras.layers.Layer):
         return ret
 
 
-class RaggedBatchNormalization(tf.keras.layers.Layer):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.batch_norm = tf.keras.layers.BatchNormalization(**kwargs)
-
-    def call(self, inputs, training=None, mask=None):
-        # Pass `training` and `mask` arguments to the `call` method of the BatchNormalization layer
-        return tf.ragged.map_flat_values(
-            lambda x: self.batch_norm(x, training=training, mask=mask), inputs
-        )
-
-    def get_config(self):
-        return super().get_config()
-
-    @classmethod
-    def from_config(cls, config):
-        return super().from_config(config)
-
-# %%
 class ASR_Network(tf.keras.Model):
     def __init__(self, base_feature, dense_feature, word_prediction, base_ratio, **kwargs):
         super().__init__()
@@ -276,9 +250,9 @@ class ASR_Network(tf.keras.Model):
         # pooling the total maps
         pooled_maps = self.pooling(total_maps, start, duration)
         # compute the deep feature
-        deep_feature = self.deep_feature(pooled_maps, training=training)
+        deep_feature = tf.ragged.map_flat_values(lambda x: self.deep_feature(x, training=training, mask=mask), pooled_maps)
         # compute the word prediction
-        word_prediction = self.word_prediction(deep_feature, training=training)
+        word_prediction = tf.ragged.map_flat_values(lambda x: self.word_prediction(x, training=training, mask=mask), deep_feature)
         return word_prediction, deep_feature
 
     # compute a input pair
