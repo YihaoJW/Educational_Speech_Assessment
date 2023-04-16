@@ -48,21 +48,21 @@ def path_resolve(config_dict):
     """
     for key in config_dict['data_location']:
         config_dict['data_location'][key] = Path(config_dict['data_location'][key])
-        if not config_dict['data_location'][key].exists():
+        if not config_dict['data_location'][key].is_dir():
             raise FileNotFoundError(f'{key} not exist')
     # for cache if not exist create the parent folder
     for key in config_dict['cache_location']:
         config_dict['cache_location'][key] = Path(config_dict['cache_location'][key])
-        if not config_dict['cache_location'][key].parent.exists():
+        if not config_dict['cache_location'][key].parent.is_dir():
             config_dict['cache_location'][key].parent.mkdir(parents=True, exist_ok=True)
     # for model storage if not exist create it
     for key in config_dict['model_storage']:
         config_dict['model_storage'][key] = Path(config_dict['model_storage'][key])
-        if not config_dict['model_storage'][key].parent.exists():
-            config_dict['model_storage'][key].parent.mkdir()
+        if not config_dict['model_storage'][key].parent.is_dir():
+            config_dict['model_storage'][key].parent.mkdir(parents=True, exist_ok=True)
         # if retrain is true delete the old model and create the folder
         if args.retrain:
-            if config_dict['model_storage'][key].exists():
+            if config_dict['model_storage'][key].is_dir():
                 if config_dict['model_storage'][key].is_file():
                     config_dict['model_storage'][key].unlink()
                 else:
