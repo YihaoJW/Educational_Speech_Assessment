@@ -172,11 +172,12 @@ class InformPooling(tf.keras.layers.Layer):
 
 # %%
 class ASR_Network(tf.keras.Model):
-    def __init__(self, base_feature, dense_feature, word_prediction, pooling_ratios):
+    def __init__(self, base_feature, dense_feature, word_prediction, base_ratio, **kwargs):
         super().__init__()
-        self.base_network = self.create_base_network(*base_feature)
-        self.deep_feature = self.build_dense_network(*dense_feature)
-        self.word_prediction = self.build_dense_network(*word_prediction)
+        self.base_network = self.create_base_network(**base_feature)
+        self.deep_feature = self.build_dense_network(**dense_feature)
+        self.word_prediction = self.build_dense_network(**word_prediction)
+        pooling_ratios = [base_ratio / 2 ** i for i in range(len(base_feature['channels_list']))]
         self.pooling = InformPooling(len(pooling_ratios), pooling_ratios)
         # define metrics
         self.train_loss = tf.keras.metrics.Mean(name='train_loss')
@@ -305,6 +306,24 @@ class ASR_Network(tf.keras.Model):
             "loss": self.train_loss.result(),
             "word_loss": self.train_word_loss.result(),
             "deep_loss": self.train_deep_loss.result()
+        }
+
+    def test_step(self, data):
+        # unpack the data, input has two pair of audio and y has one word reference
+        x, word_reference = data
+        # compute the loss for each pair
+        pair_data = self.compute_pair(x, training=False)
+        avg_word_loss, deep_loss = self.compute_loss_pair(pair_data, word_reference)
+        # compute the total loss
+        total_loss = avg_word_loss + deep_loss
+        # update the metrics
+        self.test_loss.update_state(total_loss)
+        self.test_word_loss.update_state(avg_word_loss)
+        self.test_deep_loss.update_state(deep_loss)
+        return {
+            "loss": self.test_loss.result(),
+            "word_loss": self.test_word_loss.result(),
+            "deep_loss": self.test_deep_loss.result()
         }
 
     # define metrics

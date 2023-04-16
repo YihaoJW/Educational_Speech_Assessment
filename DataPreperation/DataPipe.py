@@ -195,11 +195,29 @@ class DataPipeFactory:
         self.__raw_data = tf.data.Dataset.load(self.__cache).load(self.__cache)
         print(f'Cache saved to {self.__cache}')
 
+    # if cache folder is not exist create it
+    # or load the cache
+    # if load fail, create a new cache
+    def try_save(self) -> None:
+        if not Path(self.__cache).exists():
+            self.pre_save()
+        else:
+            try:
+                self.__raw_data = tf.data.Dataset.load(self.__cache)
+                self.__cache_status = True
+                print(f'Load cache from {self.__cache}')
+            except Exception as e:
+                print(f'Load cache failed, create new cache')
+                print(e)
+                self.pre_save()
+
+    # if cache loaded do not load again
+    # if cache not loaded, load it
     def get_raw_data(self) -> tf.data.Dataset:
-        if Path(self.__cache).exists() and not self.__cache_status:
-            self.__cache_status = True
+        if  not self.__cache_status and Path(self.__cache).exists():
             print(f'Load cache from {self.__cache}')
             self.__raw_data = tf.data.Dataset.load(self.__cache, compression='GZIP')
+            self.__cache_status = True
         return self.__raw_data
 
     def get_pair_data(self) -> tf.data.Dataset:
@@ -236,7 +254,7 @@ class DataPipeFactory:
     def k_fold(self, total_fold: int,
                fold_index: int,
                batch_size: int,
-               addition_map: Optional[Callable[[tf.data.Dataset], tf.data.Dataset]] = None,
+               addition_map: Optional[Callable[[Dict], Tuple]] = None,
                deterministic: bool = False) \
             -> Tuple[tf.data.Dataset, tf.data.Dataset]:
         if fold_index >= total_fold:
@@ -260,7 +278,7 @@ class DataPipeFactory:
 
     def get_batch_data(self,
                        batch_size: int,
-                       addition_map: Optional[Callable[[tf.data.Dataset], tf.data.Dataset]] = None,
+                       addition_map: Optional[Callable[[Dict], Tuple]] = None,
                        deterministic=False) -> tf.data.Dataset:
         if addition_map is not None:
             return self.get_raw_data().apply(self.__pair_map_handle(self.__pairs, deterministic=deterministic)).apply(
