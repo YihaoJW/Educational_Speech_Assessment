@@ -54,7 +54,7 @@ def path_resolve(config_dict):
     for key in config_dict['cache_location']:
         config_dict['cache_location'][key] = Path(config_dict['cache_location'][key])
         if not config_dict['cache_location'][key].parent.exists():
-            config_dict['cache_location'][key].parent.mkdir()
+            config_dict['cache_location'][key].parent.mkdir(parents=True, exist_ok=True)
     # for model storage if not exist create it
     for key in config_dict['model_storage']:
         config_dict['model_storage'][key] = Path(config_dict['model_storage'][key])
