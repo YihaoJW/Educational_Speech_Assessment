@@ -249,7 +249,6 @@ class ASR_Network(tf.keras.Model):
     #     total_loss = tf.reduce_sum(loss_array.stack())
     #     return total_loss
     @staticmethod
-    @tf.function
     def compute_similarity(value_a, value_b, ref_a, ref_b, margin=0.25, eps=0.001):
         # if ref_a equal ref_b then we consider it should be similar else it should be different,
         # margin prevent it been push to far away
