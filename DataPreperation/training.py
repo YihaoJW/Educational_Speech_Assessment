@@ -67,7 +67,8 @@ def path_resolve(config_dict):
                     config_dict['model_storage'][key].unlink()
                 else:
                     rmtree(config_dict['model_storage'][key])
-            config_dict['model_storage'][key].mkdir()
+            # make dir and it's parent if exist do nothing
+            config_dict['model_storage'][key].mkdir(parents=True, exist_ok=True)
 
 
 if __name__ == '__main__':
@@ -121,4 +122,3 @@ if __name__ == '__main__':
                 epochs=train_config['epoch'],
                 validation_data=dst_test,
                 callbacks=[tensorboard_callback, checkpoint_callback, backup_callback])
-    
