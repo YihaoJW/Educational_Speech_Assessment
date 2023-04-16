@@ -48,7 +48,7 @@ def path_resolve(config_dict):
     """
     for key in config_dict['data_location']:
         config_dict['data_location'][key] = Path(config_dict['data_location'][key])
-        if not config_dict['data_location'][key].is_dir():
+        if not config_dict['data_location'][key].exists():
             raise FileNotFoundError(f'{key} not exist')
     # for cache if not exist create the parent folder
     for key in config_dict['cache_location']:
