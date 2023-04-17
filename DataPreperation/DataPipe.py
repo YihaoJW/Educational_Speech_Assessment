@@ -191,7 +191,7 @@ class DataPipeFactory:
         return sample_dict
 
     def pre_save(self) -> None:
-        self.__raw_data.save(self.__cache, compression='GZIP')
+        self.__raw_data.save(self.__cache)
         self.__cache_status = True
         self.__raw_data = tf.data.Dataset.load(self.__cache).load(self.__cache)
         print(f'Cache saved to {self.__cache}')
@@ -217,7 +217,7 @@ class DataPipeFactory:
     def get_raw_data(self) -> tf.data.Dataset:
         if not self.__cache_status and Path(self.__cache).exists():
             print(f'Load cache from {self.__cache}')
-            self.__raw_data = tf.data.Dataset.load(self.__cache, compression='GZIP')
+            self.__raw_data = tf.data.Dataset.load(self.__cache)
             self.__cache_status = True
         return self.__raw_data
 
