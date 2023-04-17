@@ -109,7 +109,7 @@ if __name__ == '__main__':
                                                           write_graph=False,
                                                           write_images=True,
                                                           update_freq=25,
-                                                          write_steps_per_secondq=True)
+                                                          write_steps_per_second=True)
     checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(filepath=callback_config['model_ckpt'],
                                                              save_weights_only=True,
                                                              save_best_only=True,
