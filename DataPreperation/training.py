@@ -77,8 +77,8 @@ if __name__ == '__main__':
     parser.add_argument('--config', type=str, default='config.yaml')
     # args that if retrain the model default is False
     parser.add_argument('--retrain', type=bool, default=False)
-    # if use distributed training
-    parser.add_argument('--distributed', type=bool, default=False)
+    # if use distributed training default is False action is store_true
+    parser.add_argument('--distributed', action='store_true', default=False)
     args = parser.parse_args()
     # load the config
     with open(args.config, 'r') as f:
