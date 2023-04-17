@@ -77,6 +77,8 @@ if __name__ == '__main__':
     parser.add_argument('--config', type=str, default='config.yaml')
     # args that if retrain the model default is False
     parser.add_argument('--retrain', type=bool, default=False)
+    # if use distributed training
+    parser.add_argument('--distributed', type=bool, default=False)
     args = parser.parse_args()
     # load the config
     with open(args.config, 'r') as f:
@@ -98,8 +100,11 @@ if __name__ == '__main__':
     config['model_setting']['batch_num'] = config['training_setting']['batch_size']
     # create the network
     print("manual debug: prepare for distributed training")
-    strategy = tf.distribute.MirroredStrategy()
-    with strategy.scope():
+    if args.distributed:
+        strategy = tf.distribute.MirroredStrategy()
+        with strategy.scope():
+            network = ASR_Network(**config['model_setting'])
+    else:
         network = ASR_Network(**config['model_setting'])
     print("manual debug: network created")
     # create learning rate scheduler
