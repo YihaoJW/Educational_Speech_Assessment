@@ -71,6 +71,17 @@ def path_resolve(config_dict):
             config_dict['model_storage'][key].mkdir(parents=True, exist_ok=True)
 
 
+def data_train_eval(tf_record_path, siri_voice, siri_meta, cache):
+    train_path = config['data_location']['data_record'].parent / 'Student_Answer_Record_Train.tfrecord'
+    eval_path = config['data_location']['data_record'].parent / 'Student_Answer_Record_Eval.tfrecord'
+    train = DataPipeFactory(train_path, config['data_location']['siri_voice'],
+                            config['data_location']['siri_meta'], config['cache_location']['cache'] / 'train')
+
+    eval = DataPipeFactory(eval_path, config['data_location']['siri_voice'],
+                           config['data_location']['siri_meta'], config['cache_location']['cache'] / 'eval')
+    return train, eval
+
+
 if __name__ == '__main__':
     # parse the argument
     parser = argparse.ArgumentParser()
@@ -86,16 +97,16 @@ if __name__ == '__main__':
     path_resolve(config)
     print("manual debug: config loaded")
     # covert all path to string and create the data pipe sample if DataPipeFactory is a class
-    data_pipe = DataPipeFactory(config['data_location']['data_record'], config['data_location']['siri_voice'],
-                                config['data_location']['siri_meta'], config['cache_location']['cache'])
+    train_data, eval_data = data_train_eval(config['data_location']['data_record'],
+                                            config['data_location']['siri_voice'],
+                                            config['data_location']['siri_meta'], config['cache_location']['cache'])
     print("manual debug: data pipe created")
     # map the data_pipe
     # save the data cache if cache folder is empty
-    if not config['cache_location']['cache'].exists():
-        print('cache folder is empty, start to save the cache')
-        data_pipe.try_save()
-        print('cache saved')
-    data_pipe.get_raw_data()
+    print("manual debug: data pipe save/load start")
+    train_data.try_save()
+    eval_data.try_save()
+    print("manual debug: data pipe save/load end")
     # set the batch size
     config['model_setting']['batch_num'] = config['training_setting']['batch_size']
 
@@ -117,10 +128,8 @@ if __name__ == '__main__':
         print("manual debug: prepare for distributed training")
         strategy = tf.distribute.MirroredStrategy()
         with strategy.scope():
-            dst_train, dst_test = data_pipe.k_fold(total_fold=5,
-                                                   fold_index=0,
-                                                   batch_size=train_config['batch_size'],
-                                                   addition_map=unpack)
+            dst_train = train_data.get_batch_data(batch_size=train_config['batch_size'], addition_map=unpack)
+            dst_test = eval_data.get_batch_data(batch_size=train_config['batch_size'], addition_map=unpack)
             learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(lr_config['initial'],
                                                                            lr_config['decay_step'],
                                                                            lr_config['decay'],
@@ -130,10 +139,8 @@ if __name__ == '__main__':
             optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
             network.compile(optimizer=optimizer)
     else:
-        dst_train, dst_test = data_pipe.k_fold(total_fold=5,
-                                               fold_index=0,
-                                               batch_size=train_config['batch_size'],
-                                               addition_map=unpack)
+        dst_train = train_data.get_batch_data(batch_size=train_config['batch_size'], addition_map=unpack)
+        dst_test = eval_data.get_batch_data(batch_size=train_config['batch_size'], addition_map=unpack)
         learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(lr_config['initial'],
                                                                        lr_config['decay_step'],
                                                                        lr_config['decay'],
@@ -143,8 +150,9 @@ if __name__ == '__main__':
         optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
         network.compile(optimizer=optimizer)
     print("manual debug: network compiled")
-    print("manual debug: data pipe set, about to train")
+    print("manual debug: test the network")
     network.evaluate(dst_test)
+    print("manual debug: data pipe set, about to train")
     network.fit(dst_train,
                 epochs=train_config['epoch'],
                 validation_data=dst_test,

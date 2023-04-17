@@ -1,7 +1,8 @@
 from pathlib import Path
-from typing import Callable, Tuple, Dict, Optional
+from typing import Callable, Tuple, Dict, Optional, Any
 import tensorflow as tf
 from tensorflow import Tensor
+from tensorflow.python.data.ops.dataset_ops import DatasetV2
 
 
 class DataPipeFactory:
@@ -240,6 +241,7 @@ class DataPipeFactory:
             def handle(ds):
                 return ds.map(self.__single_mapping, num_parallel_calls=tf.data.AUTOTUNE, deterministic=deterministic) \
                     .shuffle(buffer_size=10, reshuffle_each_iteration=True)
+
             pass
         else:
             def handle(ds):
@@ -272,8 +274,10 @@ class DataPipeFactory:
             .apply(self.__pair_map_handle(self.__pairs, deterministic=deterministic)) \
             .apply(self.__batching_handle(batch_size))
         if addition_map is not None:
-            train_data = train_data.map(addition_map, num_parallel_calls=tf.data.AUTOTUNE, deterministic=deterministic).prefetch(tf.data.AUTOTUNE)
-            test_data = test_data.map(addition_map, num_parallel_calls=tf.data.AUTOTUNE, deterministic=deterministic).prefetch(tf.data.AUTOTUNE)
+            train_data = train_data.map(addition_map, num_parallel_calls=tf.data.AUTOTUNE,
+                                        deterministic=deterministic).prefetch(tf.data.AUTOTUNE)
+            test_data = test_data.map(addition_map, num_parallel_calls=tf.data.AUTOTUNE,
+                                      deterministic=deterministic).prefetch(tf.data.AUTOTUNE)
         return train_data, test_data
 
     def get_batch_data(self,
@@ -283,7 +287,34 @@ class DataPipeFactory:
         if addition_map is not None:
             return self.get_raw_data().apply(self.__pair_map_handle(self.__pairs, deterministic=deterministic)).apply(
                 self.__batching_handle(batch_size)) \
-                .map(addition_map, num_parallel_calls=tf.data.AUTOTUNE, deterministic=deterministic).prefetch(tf.data.AUTOTUNE)
+                .map(addition_map, num_parallel_calls=tf.data.AUTOTUNE, deterministic=deterministic).prefetch(
+                tf.data.AUTOTUNE)
         else:
             return self.get_raw_data().apply(self.__pair_map_handle(self.__pairs, deterministic=deterministic)).apply(
                 self.__batching_handle(batch_size))
+
+    def get_batch_data_with_eval(self,
+                                 batch_size: int,
+                                 eval_size: int,
+                                 addition_map: Optional = None,
+                                 deterministic=False):
+        if addition_map is not None:
+            dst = self.get_raw_data().skip(eval_size).apply(
+                self.__pair_map_handle(self.__pairs, deterministic=deterministic)).apply(
+                self.__batching_handle(batch_size)) \
+                .map(addition_map, num_parallel_calls=tf.data.AUTOTUNE, deterministic=deterministic).prefetch(
+                tf.data.AUTOTUNE)
+
+            dse = self.get_raw_data().take(eval_size).apply(
+                self.__pair_map_handle(self.__pairs, deterministic=deterministic)).apply(
+                self.__batching_handle(batch_size)) \
+                .map(addition_map, num_parallel_calls=tf.data.AUTOTUNE, deterministic=deterministic).prefetch(
+                tf.data.AUTOTUNE)
+        else:
+            dst = self.get_raw_data().skip(eval_size).apply(
+                self.__pair_map_handle(self.__pairs, deterministic=deterministic)).apply(
+                self.__batching_handle(batch_size))
+            dse = self.get_raw_data().take(eval_size).apply(
+                self.__pair_map_handle(self.__pairs, deterministic=deterministic)).apply(
+                self.__batching_handle(batch_size))
+        return dst, dse
