@@ -95,7 +95,7 @@ if __name__ == '__main__':
         print('cache saved')
     data_pipe.get_raw_data()
     # set the batch size
-    config['model_setting']['batch_counts'] = config['training_setting']['batch_size']
+    config['model_setting']['batch_num'] = config['training_setting']['batch_size']
     # create the network
     print("manual debug: prepare for distributed training")
     strategy = tf.distribute.MirroredStrategy()
