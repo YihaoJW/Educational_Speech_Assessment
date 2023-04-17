@@ -228,7 +228,7 @@ class DataPipeFactory:
             return ds \
                 .padded_batch(batch_size,
                               padding_values={k: tf.cast(-1, v.dtype) if v.dtype != tf.string else '' for k, v in
-                                              ds.element_spec.items()}) \
+                                              ds.element_spec.items()}, drop_remainder=True) \
                 .prefetch(tf.data.experimental.AUTOTUNE)
 
         return handle

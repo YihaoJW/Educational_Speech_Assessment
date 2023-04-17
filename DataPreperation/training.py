@@ -144,6 +144,7 @@ if __name__ == '__main__':
         network.compile(optimizer=optimizer)
     print("manual debug: network compiled")
     print("manual debug: data pipe set, about to train")
+    network.evaluate(dst_test)
     network.fit(dst_train,
                 epochs=train_config['epoch'],
                 validation_data=dst_test,
