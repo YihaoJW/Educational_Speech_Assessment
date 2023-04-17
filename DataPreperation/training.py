@@ -104,7 +104,12 @@ if __name__ == '__main__':
     lr_config = config['training_setting']['learning_rate']
     callback_config = config['model_storage']
     # create callbacks for tensorboard, checkpoint, and restore
-    tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=callback_config['tensorboard_path'], histogram_freq=1)
+    tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=callback_config['tensorboard_path'],
+                                                          histogram_freq=5,
+                                                          write_graph=False,
+                                                          write_images=True,
+                                                          update_freq=25,
+                                                          write_steps_per_secondq=True)
     checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(filepath=callback_config['model_ckpt'],
                                                              save_weights_only=True,
                                                              save_best_only=True,
@@ -138,7 +143,7 @@ if __name__ == '__main__':
                                                                            staircase=True)
             network = ASR_Network(**config['model_setting'])
             # create the optimizer
-            optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+            optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate, amsgrad=True, clipnorm=2.0, clipvalue=0.5)
             network.compile(optimizer=optimizer)
     else:
         # covert all path to string and create the data pipe sample if DataPipeFactory is a class

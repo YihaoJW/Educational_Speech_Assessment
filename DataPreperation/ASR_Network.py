@@ -173,6 +173,7 @@ class ASR_Network(tf.keras.Model):
         # define metrics
         self.loss_metrics = tf.keras.metrics.Mean(name='train_loss')
         self.word_loss_metric = tf.keras.metrics.Mean(name='train_word_loss')
+        self.word_acc_metric = tf.keras.metrics.SparseCategoricalAccuracy(name='train_word_acc')
         self.deep_loss_metric = tf.keras.metrics.Mean(name='train_deep_loss')
         # define loss
         self.category_loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, reduction='none')
@@ -195,7 +196,7 @@ class ASR_Network(tf.keras.Model):
 
     @staticmethod
     @tf.function
-    def compute_similarity(value_a, value_b, ref_a, ref_b, margin=0.25, eps=0.001):
+    def compute_similarity(value_a, value_b, ref_a, ref_b, margin=0.1, eps=0.01):
         # if ref_a equal ref_b then we consider it should be similar else it should be different,
         # margin prevent it been push to far away
         # compute the norm for ragged tensor
@@ -291,13 +292,17 @@ class ASR_Network(tf.keras.Model):
         # apply the gradient
         self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
         # update the metrics
+        (student_output, _), (reference_output, _) = pair_data
         self.loss_metrics.update_state(total_loss)
         self.word_loss_metric.update_state(avg_word_loss)
         self.deep_loss_metric.update_state(deep_loss)
+        self.word_acc_metric.update_state(word_reference.flat_values, student_output.flat_values)
+        self.word_acc_metric.update_state(word_reference.flat_values, reference_output.flat_values)
         return {
             "loss": self.loss_metrics.result(),
             "word_loss": self.word_loss_metric.result(),
-            "deep_loss": self.deep_loss_metric.result()
+            "deep_loss": self.deep_loss_metric.result(),
+            "word_acc": self.word_acc_metric.result()
         }
 
     def test_step(self, data):
@@ -309,16 +314,20 @@ class ASR_Network(tf.keras.Model):
         # compute the total loss
         total_loss = avg_word_loss + deep_loss
         # update the metrics
+        (student_output, _), (reference_output, _) = pair_data
         self.loss_metrics.update_state(total_loss)
         self.word_loss_metric.update_state(avg_word_loss)
         self.deep_loss_metric.update_state(deep_loss)
+        self.word_acc_metric.update_state(word_reference.flat_values, student_output.flat_values)
+        self.word_acc_metric.update_state(word_reference.flat_values, reference_output.flat_values)
         return {
             "loss": self.loss_metrics.result(),
             "word_loss": self.word_loss_metric.result(),
-            "deep_loss": self.deep_loss_metric.result()
+            "deep_loss": self.deep_loss_metric.result(),
+            "word_acc": self.word_acc_metric.result()
         }
 
     # define metrics
     @property
     def metrics(self):
-        return [self.loss_metrics, self.word_loss_metric, self.deep_loss_metric]
+        return [self.loss_metrics, self.word_loss_metric, self.deep_loss_metric, self.word_acc_metric]
