@@ -116,7 +116,7 @@ if __name__ == '__main__':
                                                                    lr_config['decay_step'],
                                                                    lr_config['decay'],
                                                                    staircase=True)
-    optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+    optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=learning_rate)
     # add horovod distributed optimizer
     optimizer = hvd.DistributedOptimizer(optimizer)
     # create the optimizer
