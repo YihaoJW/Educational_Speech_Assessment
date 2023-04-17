@@ -171,9 +171,9 @@ class ASR_Network(tf.keras.Model):
         pooling_ratios = [base_ratio / 2 ** i for i in range(len(base_feature['channels_list']))]
         self.pooling = InformPooling(len(pooling_ratios), pooling_ratios)
         # define metrics
-        self.train_loss = tf.keras.metrics.Mean(name='train_loss')
-        self.train_word_loss = tf.keras.metrics.Mean(name='train_word_loss')
-        self.train_deep_loss = tf.keras.metrics.Mean(name='train_deep_loss')
+        self.loss_metrics = tf.keras.metrics.Mean(name='train_loss')
+        self.word_loss_metric = tf.keras.metrics.Mean(name='train_word_loss')
+        self.deep_loss_metric = tf.keras.metrics.Mean(name='train_deep_loss')
         # define loss
         self.category_loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, reduction='none')
 
@@ -291,13 +291,13 @@ class ASR_Network(tf.keras.Model):
         # apply the gradient
         self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
         # update the metrics
-        self.train_loss.update_state(total_loss)
-        self.train_word_loss.update_state(avg_word_loss)
-        self.train_deep_loss.update_state(deep_loss)
+        self.loss_metrics.update_state(total_loss)
+        self.word_loss_metric.update_state(avg_word_loss)
+        self.deep_loss_metric.update_state(deep_loss)
         return {
-            "loss": self.train_loss.result(),
-            "word_loss": self.train_word_loss.result(),
-            "deep_loss": self.train_deep_loss.result()
+            "loss": self.loss_metrics.result(),
+            "word_loss": self.word_loss_metric.result(),
+            "deep_loss": self.deep_loss_metric.result()
         }
 
     def test_step(self, data):
@@ -309,16 +309,16 @@ class ASR_Network(tf.keras.Model):
         # compute the total loss
         total_loss = avg_word_loss + deep_loss
         # update the metrics
-        self.test_loss.update_state(total_loss)
-        self.test_word_loss.update_state(avg_word_loss)
-        self.test_deep_loss.update_state(deep_loss)
+        self.loss_metrics.update_state(total_loss)
+        self.word_loss_metric.update_state(avg_word_loss)
+        self.deep_loss_metric.update_state(deep_loss)
         return {
-            "loss": self.test_loss.result(),
-            "word_loss": self.test_word_loss.result(),
-            "deep_loss": self.test_deep_loss.result()
+            "loss": self.loss_metrics.result(),
+            "word_loss": self.word_loss_metric.result(),
+            "deep_loss": self.deep_loss_metric.result()
         }
 
     # define metrics
     @property
     def metrics(self):
-        return [self.train_loss, self.train_word_loss, self.train_deep_loss]
+        return [self.loss_metrics, self.word_loss_metric, self.deep_loss_metric]
