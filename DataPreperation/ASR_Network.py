@@ -131,7 +131,7 @@ class InformPooling(tf.keras.layers.Layer):
         start = tf.math.floor(start * ratio)
         end = tf.math.ceil((end + eps) * ratio)
         period = tf.cast(tf.stack([start, end], axis=-1), tf.int32)
-        tf.debugging.assert_less(period[..., 0], period[..., 1])
+        # tf.debugging.assert_less(period[..., 0], period[..., 1])
         ret_b = tf.TensorArray(tf.float32, batch, infer_shape=False)
         ret_count = tf.TensorArray(tf.int64, batch)
         for batch_index in tf.range(batch):
@@ -175,7 +175,7 @@ class ASR_Network(tf.keras.Model):
         self.train_word_loss = tf.keras.metrics.Mean(name='train_word_loss')
         self.train_deep_loss = tf.keras.metrics.Mean(name='train_deep_loss')
         # define loss
-        self.category_loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+        self.category_loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, reduction='none')
 
     @staticmethod
     def create_base_network(input_shape, feature_depth, channels_list, filter_size, stack_size):
@@ -267,9 +267,10 @@ class ASR_Network(tf.keras.Model):
     def compute_loss_pair(self, inputs, word_reference):
         (student_output, student_deep_feature), (reference_output, reference_deep_feature) = inputs
         # compute the loss for word prediction
-        word_loss_student = self.category_loss(word_reference, student_output)
-        word_loss_reference = self.category_loss(word_reference, reference_output)
-        avg_word_loss = (word_loss_student + word_loss_reference) / 2.
+        batch_counts = tf.shape(word_reference)[0]
+        word_loss_student = self.category_loss(word_reference.flat_values, student_output.flat_values)
+        word_loss_reference = self.category_loss(word_reference.flat_values, reference_output.flat_values)
+        avg_word_loss = tf.reduce_sum((word_loss_student + word_loss_reference) / 2.) / tf.cast(batch_counts, tf.float32)
         # compute the loss for deep feature
         deep_loss = self.compute_similarity(student_deep_feature, reference_deep_feature, word_reference,
                                             word_reference)
