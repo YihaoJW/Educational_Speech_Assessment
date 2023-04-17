@@ -88,7 +88,7 @@ if __name__ == '__main__':
     parser.add_argument('--config', type=str, default='config.yaml')
     # args that if retrain the model default is False, action is store_true
     parser.add_argument('--retrain', default=False, action='store_true')
-    # if use distributed training default is False action is store_true
+    # if you use distributed training default is False action is store_true
     parser.add_argument('--distributed', action='store_true', default=False)
     args = parser.parse_args()
     # load the config
@@ -99,7 +99,8 @@ if __name__ == '__main__':
     # covert all path to string and create the data pipe sample if DataPipeFactory is a class
     train_data, eval_data = data_train_eval(config['data_location']['data_record'],
                                             config['data_location']['siri_voice'],
-                                            config['data_location']['siri_meta'], config['cache_location']['cache'])
+                                            config['data_location']['siri_meta'],
+                                            config['cache_location']['cache'])
     print("manual debug: data pipe created")
     # map the data_pipe
     # save the data cache if cache folder is empty
