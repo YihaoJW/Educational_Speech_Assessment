@@ -99,8 +99,8 @@ if __name__ == '__main__':
     # set the batch size
     config['model_setting']['batch_num'] = config['training_setting']['batch_size']
     # create the network
-    print("manual debug: prepare for distributed training")
     if args.distributed:
+        print("manual debug: prepare for distributed training")
         strategy = tf.distribute.MirroredStrategy()
         with strategy.scope():
             network = ASR_Network(**config['model_setting'])

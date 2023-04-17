@@ -134,7 +134,7 @@ if __name__ == '__main__':
     if hvd.rank() == 0:
         callbacks += [tensorboard_callback, checkpoint_callback, backup_callback]
     # train the model
-    network.compile(optimizer=optimizer, experimental_run_tf_function=False)
+    network.compile(optimizer=optimizer)
     print("manual debug: network compiled")
     train_config = config['training_setting']
     # set datapipe to final state
