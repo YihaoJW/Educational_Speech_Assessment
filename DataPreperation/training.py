@@ -94,8 +94,13 @@ if __name__ == '__main__':
         data_pipe.try_save()
         print('cache saved')
     data_pipe.get_raw_data()
+    # set the batch size
+    config['model_setting']['batch_counts'] = config['training_setting']['batch_size']
     # create the network
-    network = ASR_Network(**config['model_setting'])
+    print("manual debug: prepare for distributed training")
+    strategy = tf.distribute.MirroredStrategy()
+    with strategy.scope():
+        network = ASR_Network(**config['model_setting'])
     print("manual debug: network created")
     # create learning rate scheduler
     lr_config = config['training_setting']['learning_rate']

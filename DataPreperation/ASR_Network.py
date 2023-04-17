@@ -163,7 +163,7 @@ class InformPooling(tf.keras.layers.Layer):
 
 
 class ASR_Network(tf.keras.Model):
-    def __init__(self, base_feature, dense_feature, word_prediction, base_ratio, **kwargs):
+    def __init__(self, base_feature, dense_feature, word_prediction, base_ratio, batch_num, **kwargs):
         super().__init__()
         self.base_network = self.create_base_network(**base_feature)
         self.deep_feature = self.build_dense_network(**dense_feature)
@@ -176,6 +176,7 @@ class ASR_Network(tf.keras.Model):
         self.deep_loss_metric = tf.keras.metrics.Mean(name='train_deep_loss')
         # define loss
         self.category_loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, reduction='none')
+        self.batch_counts = tf.Variable(batch_num, dtype=tf.int64, trainable=False)
 
     @staticmethod
     def create_base_network(input_shape, feature_depth, channels_list, filter_size, stack_size):
@@ -267,13 +268,12 @@ class ASR_Network(tf.keras.Model):
     def compute_loss_pair(self, inputs, word_reference):
         (student_output, student_deep_feature), (reference_output, reference_deep_feature) = inputs
         # compute the loss for word prediction
-        batch_counts = tf.shape(word_reference)[0]
         word_loss_student = self.category_loss(word_reference.flat_values, student_output.flat_values)
         word_loss_reference = self.category_loss(word_reference.flat_values, reference_output.flat_values)
-        avg_word_loss = tf.reduce_sum((word_loss_student + word_loss_reference) / 2.) / tf.cast(batch_counts, tf.float32)
+        avg_word_loss = tf.reduce_sum((word_loss_student + word_loss_reference) / 2.) / tf.cast(self.batch_counts, tf.float32)
         # compute the loss for deep feature
         deep_loss = self.compute_similarity(student_deep_feature, reference_deep_feature, word_reference,
-                                            word_reference)
+                                            word_reference) / tf.cast(self.batch_counts, tf.float32)
         return avg_word_loss, deep_loss
 
     def train_step(self, data):
