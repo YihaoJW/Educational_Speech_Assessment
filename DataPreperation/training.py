@@ -72,13 +72,13 @@ def path_resolve(config_dict, args):
 
 
 def data_train_eval(tf_record_path, siri_voice, siri_meta, cache):
-    train_path = config['data_location']['data_record'].parent / 'Student_Answer_Record_Train.tfrecord'
-    eval_path = config['data_location']['data_record'].parent / 'Student_Answer_Record_Eval.tfrecord'
-    train = DataPipeFactory(train_path, config['data_location']['siri_voice'],
-                            config['data_location']['siri_meta'], config['cache_location']['cache'] / 'train')
+    train_path = tf_record_path.parent / 'Student_Answer_Record_Train.tfrecord'
+    assert train_path.exists()
+    eval_path = tf_record_path.parent / 'Student_Answer_Record_Eval.tfrecord'
+    assert eval_path.exists()
+    train = DataPipeFactory(train_path, siri_voice, siri_meta, cache / 'train')
 
-    eval = DataPipeFactory(eval_path, config['data_location']['siri_voice'],
-                           config['data_location']['siri_meta'], config['cache_location']['cache'] / 'eval')
+    eval = DataPipeFactory(eval_path, siri_voice, siri_meta, cache / 'eval')
     return train, eval
 
 
