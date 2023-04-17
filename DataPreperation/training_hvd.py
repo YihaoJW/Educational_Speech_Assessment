@@ -112,7 +112,7 @@ if __name__ == '__main__':
     print("manual debug: network created")
     # create learning rate scheduler
     lr_config = config['training_setting']['learning_rate']
-    learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(lr_config['initial'] * hvd.size(),
+    learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(lr_config['initial'],
                                                                    lr_config['decay_step'],
                                                                    lr_config['decay'],
                                                                    staircase=True)
