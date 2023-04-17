@@ -98,23 +98,10 @@ if __name__ == '__main__':
     data_pipe.get_raw_data()
     # set the batch size
     config['model_setting']['batch_num'] = config['training_setting']['batch_size']
-    # create the network
-    if args.distributed:
-        print("manual debug: prepare for distributed training")
-        strategy = tf.distribute.MirroredStrategy()
-        with strategy.scope():
-            network = ASR_Network(**config['model_setting'])
-    else:
-        network = ASR_Network(**config['model_setting'])
+
     print("manual debug: network created")
     # create learning rate scheduler
     lr_config = config['training_setting']['learning_rate']
-    learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(lr_config['initial'],
-                                                                   lr_config['decay_step'],
-                                                                   lr_config['decay'],
-                                                                   staircase=True)
-    # create the optimizer
-    optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
     callback_config = config['model_storage']
     # create callbacks for tensorboard, checkpoint, and restore
     tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=callback_config['tensorboard_path'], histogram_freq=1)
@@ -124,14 +111,38 @@ if __name__ == '__main__':
                                                              monitor='val_loss')
     backup_callback = tf.keras.callbacks.BackupAndRestore(backup_dir=callback_config['model_restore'])
     # train the model
-    network.compile(optimizer=optimizer)
-    print("manual debug: network compiled")
     train_config = config['training_setting']
     # set datapipe to final state
-    dst_train, dst_test = data_pipe.k_fold(total_fold=5,
-                                           fold_index=0,
-                                           batch_size=train_config['batch_size'],
-                                           addition_map=unpack)
+    if args.distributed:
+        print("manual debug: prepare for distributed training")
+        strategy = tf.distribute.MirroredStrategy()
+        with strategy.scope():
+            dst_train, dst_test = data_pipe.k_fold(total_fold=5,
+                                                   fold_index=0,
+                                                   batch_size=train_config['batch_size'],
+                                                   addition_map=unpack)
+            learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(lr_config['initial'],
+                                                                           lr_config['decay_step'],
+                                                                           lr_config['decay'],
+                                                                           staircase=True)
+            network = ASR_Network(**config['model_setting'])
+            # create the optimizer
+            optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+            network.compile(optimizer=optimizer)
+    else:
+        dst_train, dst_test = data_pipe.k_fold(total_fold=5,
+                                               fold_index=0,
+                                               batch_size=train_config['batch_size'],
+                                               addition_map=unpack)
+        learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(lr_config['initial'],
+                                                                       lr_config['decay_step'],
+                                                                       lr_config['decay'],
+                                                                       staircase=True)
+        network = ASR_Network(**config['model_setting'])
+        # create the optimizer
+        optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+        network.compile(optimizer=optimizer)
+    print("manual debug: network compiled")
     print("manual debug: data pipe set, about to train")
     network.fit(dst_train,
                 epochs=train_config['epoch'],
