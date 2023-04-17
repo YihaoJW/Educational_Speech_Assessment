@@ -24,7 +24,7 @@ def unpack(d):
 
 
 # helper function resolve path related issue it receive a dict return void
-def path_resolve(config_dict):
+def path_resolve(config_dict, args):
     """
     Sample of configuation file
     config = {'model_setting': {'base_feature': dict(zip(base_feature_name, base_feature)),
@@ -94,20 +94,8 @@ if __name__ == '__main__':
     # load the config
     with open(args.config, 'r') as f:
         config = safe_load(f)
-    path_resolve(config)
+    path_resolve(config, args)
     print("manual debug: config loaded")
-    # covert all path to string and create the data pipe sample if DataPipeFactory is a class
-    train_data, eval_data = data_train_eval(config['data_location']['data_record'],
-                                            config['data_location']['siri_voice'],
-                                            config['data_location']['siri_meta'],
-                                            config['cache_location']['cache'])
-    print("manual debug: data pipe created")
-    # map the data_pipe
-    # save the data cache if cache folder is empty
-    print("manual debug: data pipe save/load start")
-    train_data.try_save()
-    eval_data.try_save()
-    print("manual debug: data pipe save/load end")
     # set the batch size
     config['model_setting']['batch_num'] = config['training_setting']['batch_size']
 
@@ -128,6 +116,19 @@ if __name__ == '__main__':
     if args.distributed:
         print("manual debug: prepare for distributed training")
         strategy = tf.distribute.MirroredStrategy()
+        # covert all path to string and create the data pipe sample if DataPipeFactory is a class
+        train_data, eval_data = data_train_eval(config['data_location']['data_record'],
+                                                config['data_location']['siri_voice'],
+                                                config['data_location']['siri_meta'],
+                                                config['cache_location']['cache'])
+        print("manual debug: data pipe created")
+        # map the data_pipe
+        # save the data cache if cache folder is empty
+        print("manual debug: data pipe save/load start")
+        train_data.try_save()
+        eval_data.try_save()
+        print("manual debug: data pipe save/load end")
+
         with strategy.scope():
             dst_train = train_data.get_batch_data(batch_size=train_config['batch_size'], addition_map=unpack)
             dst_test = eval_data.get_batch_data(batch_size=train_config['batch_size'], addition_map=unpack)
@@ -140,6 +141,19 @@ if __name__ == '__main__':
             optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
             network.compile(optimizer=optimizer)
     else:
+        # covert all path to string and create the data pipe sample if DataPipeFactory is a class
+        train_data, eval_data = data_train_eval(config['data_location']['data_record'],
+                                                config['data_location']['siri_voice'],
+                                                config['data_location']['siri_meta'],
+                                                config['cache_location']['cache'])
+        print("manual debug: data pipe created")
+        # map the data_pipe
+        # save the data cache if cache folder is empty
+        print("manual debug: data pipe save/load start")
+        train_data.try_save()
+        eval_data.try_save()
+        print("manual debug: data pipe save/load end")
+
         dst_train = train_data.get_batch_data(batch_size=train_config['batch_size'], addition_map=unpack)
         dst_test = eval_data.get_batch_data(batch_size=train_config['batch_size'], addition_map=unpack)
         learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(lr_config['initial'],
