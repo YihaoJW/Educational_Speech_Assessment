@@ -9,7 +9,7 @@ dense_feature_name = ('input_shape', 'output_shape', 'channels_list', 'stack_siz
 word_prediction = ([512], 2500, [512, 1024], 2)
 word_prediction_name = ('input_shape', 'output_shape', 'channels_list', 'stack_size')
 base_ratio = 125
-margin = 0.5
+margin = 0.4
 # generate a dictionary to store the configuration
 config = {'model_setting': {'base_feature': dict(zip(base_feature_name, base_feature)),
                             'dense_feature': dict(zip(dense_feature_name, dense_feature)),

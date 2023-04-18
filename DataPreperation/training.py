@@ -31,7 +31,7 @@ def path_resolve(config_dict, args):
                             'dense_feature': dict(zip(dense_feature_name, dense_feature)),
                             'word_prediction': dict(zip(word_prediction_name, word_prediction)),
                             'base_ratio': base_ratio
-                            'margin': 0.5},
+                            'margin': 0.4},
           'model_storage': {'model_ckpt': 'checkpoint/{epoch:06d}_{val_loss:.2f}.ckpt',
                             'model_restore': 'backup/model.ckpt',
                             'tensorboard_path': 'tensorboard/'},
