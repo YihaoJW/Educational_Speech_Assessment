@@ -9,12 +9,13 @@ dense_feature_name = ('input_shape', 'output_shape', 'channels_list', 'stack_siz
 word_prediction = ([512], 2500, [512, 1024], 2)
 word_prediction_name = ('input_shape', 'output_shape', 'channels_list', 'stack_size')
 base_ratio = 125
-
+margin = 0.5
 # generate a dictionary to store the configuration
 config = {'model_setting': {'base_feature': dict(zip(base_feature_name, base_feature)),
                             'dense_feature': dict(zip(dense_feature_name, dense_feature)),
                             'word_prediction': dict(zip(word_prediction_name, word_prediction)),
-                            'base_ratio': base_ratio},
+                            'base_ratio': base_ratio,
+                            'margin': margin},
           'model_storage': {'model_ckpt': 'checkpoint/{epoch:06d}_{val_loss:.2f}.ckpt',
                             'model_restore': 'backup/model.ckpt',
                             'tensorboard_path': 'tensorboard/'},

@@ -163,7 +163,7 @@ class InformPooling(tf.keras.layers.Layer):
 
 
 class ASR_Network(tf.keras.Model):
-    def __init__(self, base_feature, dense_feature, word_prediction, base_ratio, batch_num, **kwargs):
+    def __init__(self, base_feature, dense_feature, word_prediction, base_ratio, batch_num, margin, **kwargs):
         super().__init__()
         self.base_network = self.create_base_network(**base_feature)
         self.deep_feature = self.build_dense_network(**dense_feature)
@@ -178,7 +178,7 @@ class ASR_Network(tf.keras.Model):
         # define loss
         self.category_loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, reduction='none')
         self.batch_counts = tf.Variable(batch_num, dtype=tf.int64, trainable=False)
-
+        self.margin = margin
     @staticmethod
     def create_base_network(input_shape, feature_depth, channels_list, filter_size, stack_size):
         x = tf.keras.Input(input_shape)
@@ -196,7 +196,7 @@ class ASR_Network(tf.keras.Model):
 
     @staticmethod
     @tf.function
-    def compute_similarity(value_a, value_b, ref_a, ref_b, margin=0.1, eps=0.01):
+    def compute_similarity(value_a, value_b, ref_a, ref_b, margin=0.35, eps=0.01):
         # if ref_a equal ref_b then we consider it should be similar else it should be different,
         # margin prevent it been push to far away
         # compute the norm for ragged tensor
@@ -229,13 +229,13 @@ class ASR_Network(tf.keras.Model):
             # compute the average similarity for the negative samples
             avg_sim_neg = tf.reduce_sum(tf.multiply(similarity_matrix, mask_neg)) / num_neg
             # compute the max similarity for the positive samples
-            max_sim_pos = tf.reduce_max(tf.multiply(similarity_matrix, mask))
+            min_sim_pos = tf.reduce_min(tf.multiply(similarity_matrix, mask))
             # compute the min similarity for the negative samples
-            min_sim_neg = tf.reduce_min(tf.multiply(similarity_matrix, mask_neg))
+            max_sim_neg = tf.reduce_max(tf.multiply(similarity_matrix, mask_neg))
             # compute the average loss with margin
-            loss_avg = tf.maximum(0., margin + avg_sim_pos - avg_sim_neg)
+            loss_avg = tf.maximum(0., margin - avg_sim_pos + avg_sim_neg)
             # compute min_max loss with margin
-            loss_min_max = tf.maximum(0., margin + max_sim_pos - min_sim_neg)
+            loss_min_max = tf.maximum(0., margin - min_sim_pos + max_sim_neg)
             # total loss
             loss = loss_avg + loss_min_max
             loss_array = loss_array.write(idx, loss)
@@ -274,7 +274,7 @@ class ASR_Network(tf.keras.Model):
         avg_word_loss = tf.reduce_sum((word_loss_student + word_loss_reference) / 2.) / tf.cast(self.batch_counts, tf.float32)
         # compute the loss for deep feature
         deep_loss = self.compute_similarity(student_deep_feature, reference_deep_feature, word_reference,
-                                            word_reference) / tf.cast(self.batch_counts, tf.float32)
+                                            word_reference, margin=self.margin) / tf.cast(self.batch_counts, tf.float32)
         return avg_word_loss, deep_loss
 
     def train_step(self, data):
