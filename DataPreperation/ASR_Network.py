@@ -308,7 +308,7 @@ class ASR_Network(tf.keras.Model):
             pair_data = self.compute_pair(x, training=True)
             avg_word_loss, deep_loss = self.compute_loss_pair(pair_data, word_reference)
             # compute the total loss
-            total_loss = self.auto_balancing_layer(avg_word_loss, deep_loss, training=True)
+            total_loss = self.auto_balancing_layer([avg_word_loss, deep_loss], training=True)
         # compute the gradient
         gradients = tape.gradient(total_loss, self.trainable_variables)
         # apply the gradient
@@ -336,7 +336,7 @@ class ASR_Network(tf.keras.Model):
         pair_data = self.compute_pair(x, training=False)
         avg_word_loss, deep_loss = self.compute_loss_pair(pair_data, word_reference)
         # compute the total loss
-        total_loss = self.auto_balancing_layer(avg_word_loss, deep_loss, training=False)
+        total_loss = self.auto_balancing_layer([avg_word_loss, deep_loss], training=False)
         # update the metrics
         (student_output, _), (reference_output, _) = pair_data
         self.loss_metrics.update_state(total_loss)
