@@ -49,14 +49,6 @@ if __name__ == '__main__':
         config = safe_load(f)
     path_resolve(config, args)
     print("manual debug: config loaded")
-    # Launching tensorboard
-    tb_process = None
-    try:
-        tb_process = init_tensorboard(config)
-        print(f"manual debug: tensorboard upload at {config['model_storage']['tensorboard_path']}")
-    except Exception as e:
-        print(e, file=sys.stderr)
-        print("manual debug: tensorboard upload failed")
     # set the batch size
     config['model_setting']['batch_num'] = config['training_setting']['batch_size']
 
@@ -134,6 +126,15 @@ if __name__ == '__main__':
     print("manual debug: test the network")
     network.evaluate(dst_test)
     print("manual debug: data pipe set, about to train")
+
+    # Launching tensorboard
+    tb_process = None
+    try:
+        tb_process = init_tensorboard(log_dir=config['model_storage']['tensorboard_path'])
+        print(f"manual debug: tensorboard upload at {config['model_storage']['tensorboard_path']}")
+    except Exception as e:
+        print(e, file=sys.stderr)
+        print("manual debug: tensorboard upload failed")
     # Check if tensorboard is up
     if tb_process.poll() is None:
         print("manual debug: tensorboard is up")
@@ -149,6 +150,7 @@ if __name__ == '__main__':
         print(tb_err, file=sys.stderr)
 
     print("manual debug: start training")
+
     network.fit(dst_train,
                 epochs=train_config['epoch'],
                 validation_data=dst_test,
