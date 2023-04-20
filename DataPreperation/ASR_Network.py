@@ -168,7 +168,7 @@ class AutoLossBalancing(tf.keras.layers.Layer):
         self.auto_balancing = self.add_weight('auto_balancing', shape=(2,), dtype=tf.float32, trainable=True,
                                               initializer='zeros')
 
-    def call(self, inputs, training=False, mask=None):
+    def call(self, inputs, training=None, mask=None):
         word_loss, deep_loss = inputs[0], inputs[1]
         weighted_loss = tf.reduce_sum(
             (1 / (tf.exp(self.auto_balancing)) ** 2) * tf.stack([word_loss, deep_loss / 2], axis=0))
@@ -177,8 +177,8 @@ class AutoLossBalancing(tf.keras.layers.Layer):
 
 
 class ASR_Network(tf.keras.Model):
-    def __init__(self, base_feature, dense_feature, word_prediction, base_ratio, batch_num, margin, k=5, **kwargs):
-        super().__init__()
+    def __init__(self, base_feature, dense_feature, word_prediction, base_ratio, batch_num, margin, k_top=5, **kwargs):
+        super().__init__(**kwargs)
         self.base_network = self.create_base_network(**base_feature)
         self.deep_feature = self.build_dense_network(**dense_feature)
         self.word_prediction = self.build_dense_network(**word_prediction)
@@ -189,7 +189,7 @@ class ASR_Network(tf.keras.Model):
         self.word_loss_metric = tf.keras.metrics.Mean(name='train_word_loss')
         self.word_acc_metric = tf.keras.metrics.SparseCategoricalAccuracy(name='train_word_acc')
         self.deep_loss_metric = tf.keras.metrics.Mean(name='train_deep_loss')
-        self.k = k
+        self.k = k_top
         self.top_k_acc_metric = tf.keras.metrics.SparseTopKCategoricalAccuracy(k=self.k,
                                                                                name=f'train_top_{self.k}_word_acc')
         # define loss
