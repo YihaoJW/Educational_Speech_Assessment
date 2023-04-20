@@ -1,5 +1,81 @@
+import subprocess
+import time
+from pathlib import Path
 import tensorflow as tf
 from tensorflow.python.keras import layers, activations
+from shutil import rmtree
+
+
+def init_tensorboard(log_dir):
+    """
+    initialize tensorboard session
+    :param log_dir:
+    :return:
+    """
+    # check the log_dir not exist init a new one
+    log_dir = Path(log_dir)
+    if not log_dir.exists():
+        log_dir.mkdir(parents=True)
+    name = log_dir.parent.name
+    # add time in to name
+    describe = str(name) + '_' + time.strftime('%Y-%m-%d_%H:%M:%S', time.localtime(time.time()))
+    command = f"tensorboard dev upload --logdir {str(log_dir)} --name {name} --description {describe} --verbose 0"
+    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    time.sleep(5)  # wait for the subprocess to start
+    return process
+
+
+# helper function resolve path related issue it receive a dict return void
+def path_resolve(config_dict, args):
+    """
+    Sample of configuration file
+    config = {'model_setting': {'base_feature': dict(zip(base_feature_name, base_feature)),
+                            'dense_feature': dict(zip(dense_feature_name, dense_feature)),
+                            'word_prediction': dict(zip(word_prediction_name, word_prediction)),
+                            'base_ratio': base_ratio
+                            'margin': 0.4},
+          'model_storage': {'model_ckpt': 'checkpoint/{epoch:06d}_{val_loss:.2f}.ckpt',
+                            'model_restore': 'backup/model.ckpt',
+                            'tensorboard_path': 'tensorboard/'},
+          'training_setting': {'batch_size': 32,
+                               'epoch': 1000,
+                               'learning_rate': {'initial': 0.001,
+                                                 'decay': 0.1,
+                                                 'decay_step': 100},
+                               },
+          'data_location': {'data_record': 'Tensorflow_DataRecord/Student_Answer_Record.tfrecord',
+                            'siri_voice': 'Siri_Related/Siri_Reference_Sample',
+                            'siri_meta': 'Siri_Related/Siri_Dense_Index'},
+          'cache_location': {'cache': 'cache/'}
+          }
+    """
+    for key in config_dict['data_location']:
+        config_dict['data_location'][key] = Path(config_dict['data_location'][key])
+        if not config_dict['data_location'][key].exists():
+            raise FileNotFoundError(f'{key} not exist')
+    # for cache if not exist create the parent folder
+    for key in config_dict['cache_location']:
+        config_dict['cache_location'][key] = Path(config_dict['cache_location'][key])
+        if not config_dict['cache_location'][key].parent.is_dir():
+            config_dict['cache_location'][key].parent.mkdir(parents=True, exist_ok=True)
+    # for model storage if not exist create it
+    for key in config_dict['model_storage']:
+        config_dict['model_storage'][key] = Path(config_dict['model_storage'][key])
+        if not config_dict['model_storage'][key].parent.is_dir():
+            config_dict['model_storage'][key].parent.mkdir(parents=True, exist_ok=True)
+        # if retrain is true delete the old model and create the folder
+        if args.retrain:
+            if config_dict['model_storage'][key].is_dir():
+                if config_dict['model_storage'][key].is_file():
+                    config_dict['model_storage'][key].unlink()
+                else:
+                    rmtree(config_dict['model_storage'][key])
+            else:
+                # if the path is not a dir
+                if config_dict['model_storage'][key].is_file():
+                    config_dict['model_storage'][key].unlink()
+            # make dir and it's parent if exist do nothing
+            config_dict['model_storage'][key].mkdir(parents=True, exist_ok=True)
 
 
 @tf.function

@@ -2,9 +2,10 @@ from yaml import load, dump, safe_load
 import tensorflow as tf
 from ASR_Network import ASR_Network
 from DataPipe import DataPipeFactory
-from pathlib import Path
-from shutil import rmtree
 import argparse
+import sys
+import time
+from util_function import init_tensorboard, path_resolve
 
 
 def unpack(d):
@@ -21,55 +22,6 @@ def unpack(d):
 
     words = tf.RaggedTensor.from_tensor(d['valid_ref_word'], padding=-1)
     return ((value_s, (start_s, duration_s)), (value_f, (start_f, duration_f))), words
-
-
-# helper function resolve path related issue it receive a dict return void
-def path_resolve(config_dict, args):
-    """
-    Sample of configuation file
-    config = {'model_setting': {'base_feature': dict(zip(base_feature_name, base_feature)),
-                            'dense_feature': dict(zip(dense_feature_name, dense_feature)),
-                            'word_prediction': dict(zip(word_prediction_name, word_prediction)),
-                            'base_ratio': base_ratio
-                            'margin': 0.4},
-          'model_storage': {'model_ckpt': 'checkpoint/{epoch:06d}_{val_loss:.2f}.ckpt',
-                            'model_restore': 'backup/model.ckpt',
-                            'tensorboard_path': 'tensorboard/'},
-          'training_setting': {'batch_size': 32,
-                               'epoch': 1000,
-                               'learning_rate': {'initial': 0.001,
-                                                 'decay': 0.1,
-                                                 'decay_step': 100},
-                               },
-          'data_location': {'data_record': 'Tensorflow_DataRecord/Student_Answer_Record.tfrecord',
-                            'siri_voice': 'Siri_Related/Siri_Reference_Sample',
-                            'siri_meta': 'Siri_Related/Siri_Dense_Index'},
-          'cache_location': {'cache': 'cache/'}
-          }
-    """
-    for key in config_dict['data_location']:
-        config_dict['data_location'][key] = Path(config_dict['data_location'][key])
-        if not config_dict['data_location'][key].exists():
-            raise FileNotFoundError(f'{key} not exist')
-    # for cache if not exist create the parent folder
-    for key in config_dict['cache_location']:
-        config_dict['cache_location'][key] = Path(config_dict['cache_location'][key])
-        if not config_dict['cache_location'][key].parent.is_dir():
-            config_dict['cache_location'][key].parent.mkdir(parents=True, exist_ok=True)
-    # for model storage if not exist create it
-    for key in config_dict['model_storage']:
-        config_dict['model_storage'][key] = Path(config_dict['model_storage'][key])
-        if not config_dict['model_storage'][key].parent.is_dir():
-            config_dict['model_storage'][key].parent.mkdir(parents=True, exist_ok=True)
-        # if retrain is true delete the old model and create the folder
-        if args.retrain:
-            if config_dict['model_storage'][key].is_dir():
-                if config_dict['model_storage'][key].is_file():
-                    config_dict['model_storage'][key].unlink()
-                else:
-                    rmtree(config_dict['model_storage'][key])
-            # make dir and it's parent if exist do nothing
-            config_dict['model_storage'][key].mkdir(parents=True, exist_ok=True)
 
 
 def data_train_eval(tf_record_path, siri_voice, siri_meta, cache):
@@ -97,6 +49,14 @@ if __name__ == '__main__':
         config = safe_load(f)
     path_resolve(config, args)
     print("manual debug: config loaded")
+    # Launching tensorboard
+    tb_process = None
+    try:
+        tb_process = init_tensorboard(config)
+        print(f"manual debug: tensorboard upload at {config['model_storage']['tensorboard_path']}")
+    except Exception as e:
+        print(e, file=sys.stderr)
+        print("manual debug: tensorboard upload failed")
     # set the batch size
     config['model_setting']['batch_num'] = config['training_setting']['batch_size']
 
@@ -178,3 +138,11 @@ if __name__ == '__main__':
                 epochs=train_config['epoch'],
                 validation_data=dst_test,
                 callbacks=[tensorboard_callback, checkpoint_callback, backup_callback])
+
+    # End Tensorboard if tb_process is not None
+    if tb_process is not None:
+        tb_process.terminate()
+        # kill if the process is still alive after 15 seconds
+        time.sleep(15)
+        if tb_process.poll() is None:
+            tb_process.kill()

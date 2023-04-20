@@ -2,11 +2,11 @@ from yaml import safe_dump
 import argparse
 from pathlib import Path
 
-base_feature = ([None, 80], 512, [128, 256, 384, 512], 3, 2)
+base_feature = ([None, 80], 128, [128, 256, 384, 384], 3, 2)
 base_feature_name = ('input_shape', 'feature_depth', 'channels_list', 'filter_size', 'stack_size')
-dense_feature = ([1280], 512, [512, 512], 2)
+dense_feature = ([896], 256, [256, 256], 2)
 dense_feature_name = ('input_shape', 'output_shape', 'channels_list', 'stack_size')
-word_prediction = ([512], 2500, [512, 1024], 2)
+word_prediction = ([256], 1800, [256, 256], 1)
 word_prediction_name = ('input_shape', 'output_shape', 'channels_list', 'stack_size')
 base_ratio = 125
 margin = 0.4

@@ -119,7 +119,7 @@ class InformPooling(tf.keras.layers.Layer):
         self.ratios_list = ratios_list
 
     def build(self, input_shape):
-        # Input is a bunch of tensor, calcuate the total number of feature maps
+        # Input is a bunch of tensor, calculate the total number of feature maps
         self.num_maps_shape = sum([x[-1] for x in input_shape])
         super().build(input_shape)
 
@@ -162,8 +162,22 @@ class InformPooling(tf.keras.layers.Layer):
         return ret
 
 
+class AutoLossBalancing(tf.keras.layers.Layer):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.auto_balancing = self.add_weight('auto_balancing', shape=(2,), dtype=tf.float32, trainable=True,
+                                              initializer='zeros')
+
+    def call(self, inputs, training=None, mask=None):
+        word_loss, deep_loss = inputs
+        weighted_loss = tf.reduce_sum(
+            (1 / (tf.exp(self.auto_balancing)) ** 2) * tf.stack([word_loss, deep_loss / 2], axis=0))
+        total_loss = weighted_loss + tf.reduce_sum(self.auto_balancing)
+        return total_loss
+
+
 class ASR_Network(tf.keras.Model):
-    def __init__(self, base_feature, dense_feature, word_prediction, base_ratio, batch_num, margin, **kwargs):
+    def __init__(self, base_feature, dense_feature, word_prediction, base_ratio, batch_num, margin, k=5, **kwargs):
         super().__init__()
         self.base_network = self.create_base_network(**base_feature)
         self.deep_feature = self.build_dense_network(**dense_feature)
@@ -175,10 +189,15 @@ class ASR_Network(tf.keras.Model):
         self.word_loss_metric = tf.keras.metrics.Mean(name='train_word_loss')
         self.word_acc_metric = tf.keras.metrics.SparseCategoricalAccuracy(name='train_word_acc')
         self.deep_loss_metric = tf.keras.metrics.Mean(name='train_deep_loss')
+        self.k = k
+        self.top_k_acc_metric = tf.keras.metrics.SparseTopKCategoricalAccuracy(k=self.k,
+                                                                               name=f'train_top_{self.k}_word_acc')
         # define loss
         self.category_loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True, reduction='none')
         self.batch_counts = tf.Variable(batch_num, dtype=tf.int64, trainable=False)
         self.margin = margin
+        self.auto_balancing_layer = AutoLossBalancing(name='auto_loss_balancing')
+
     @staticmethod
     def create_base_network(input_shape, feature_depth, channels_list, filter_size, stack_size):
         x = tf.keras.Input(input_shape)
@@ -252,9 +271,11 @@ class ASR_Network(tf.keras.Model):
         # pooling the total maps
         pooled_maps = self.pooling(total_maps, start, duration)
         # compute the deep feature
-        deep_feature = tf.ragged.map_flat_values(lambda x: self.deep_feature(x, training=training, mask=mask), pooled_maps)
+        deep_feature = tf.ragged.map_flat_values(lambda x: self.deep_feature(x, training=training, mask=mask),
+                                                 pooled_maps)
         # compute the word prediction
-        word_prediction = tf.ragged.map_flat_values(lambda x: self.word_prediction(x, training=training, mask=mask), deep_feature)
+        word_prediction = tf.ragged.map_flat_values(lambda x: self.word_prediction(x, training=training, mask=mask),
+                                                    deep_feature)
         return word_prediction, deep_feature
 
     # compute a input pair
@@ -271,7 +292,8 @@ class ASR_Network(tf.keras.Model):
         # compute the loss for word prediction
         word_loss_student = self.category_loss(word_reference.flat_values, student_output.flat_values)
         word_loss_reference = self.category_loss(word_reference.flat_values, reference_output.flat_values)
-        avg_word_loss = tf.reduce_sum((word_loss_student + word_loss_reference) / 2.) / tf.cast(self.batch_counts, tf.float32)
+        avg_word_loss = tf.reduce_sum((word_loss_student + word_loss_reference) / 2.) / tf.cast(self.batch_counts,
+                                                                                                tf.float32)
         # compute the loss for deep feature
         deep_loss = self.compute_similarity(student_deep_feature, reference_deep_feature, word_reference,
                                             word_reference, margin=self.margin) / tf.cast(self.batch_counts, tf.float32)
@@ -286,7 +308,7 @@ class ASR_Network(tf.keras.Model):
             pair_data = self.compute_pair(x, training=True)
             avg_word_loss, deep_loss = self.compute_loss_pair(pair_data, word_reference)
             # compute the total loss
-            total_loss = avg_word_loss + deep_loss
+            total_loss = self.auto_balancing_layer(avg_word_loss, deep_loss)
         # compute the gradient
         gradients = tape.gradient(total_loss, self.trainable_variables)
         # apply the gradient
@@ -298,11 +320,13 @@ class ASR_Network(tf.keras.Model):
         self.deep_loss_metric.update_state(deep_loss)
         self.word_acc_metric.update_state(word_reference.flat_values, student_output.flat_values)
         self.word_acc_metric.update_state(word_reference.flat_values, reference_output.flat_values)
+        self.top_k_acc_metric.update_state(word_reference.flat_values, student_output.flat_values)
         return {
             "loss": self.loss_metrics.result(),
             "word_loss": self.word_loss_metric.result(),
             "deep_loss": self.deep_loss_metric.result(),
-            "word_acc": self.word_acc_metric.result()
+            "word_acc": self.word_acc_metric.result(),
+            f"top_{self.k}_word_acc": self.top_k_acc_metric.result()
         }
 
     def test_step(self, data):
@@ -312,7 +336,7 @@ class ASR_Network(tf.keras.Model):
         pair_data = self.compute_pair(x, training=False)
         avg_word_loss, deep_loss = self.compute_loss_pair(pair_data, word_reference)
         # compute the total loss
-        total_loss = avg_word_loss + deep_loss
+        total_loss = self.auto_balancing_layer(avg_word_loss, deep_loss)
         # update the metrics
         (student_output, _), (reference_output, _) = pair_data
         self.loss_metrics.update_state(total_loss)
@@ -320,14 +344,20 @@ class ASR_Network(tf.keras.Model):
         self.deep_loss_metric.update_state(deep_loss)
         self.word_acc_metric.update_state(word_reference.flat_values, student_output.flat_values)
         self.word_acc_metric.update_state(word_reference.flat_values, reference_output.flat_values)
+        self.top_k_acc_metric.update_state(word_reference.flat_values, student_output.flat_values)
         return {
             "loss": self.loss_metrics.result(),
             "word_loss": self.word_loss_metric.result(),
             "deep_loss": self.deep_loss_metric.result(),
-            "word_acc": self.word_acc_metric.result()
+            "word_acc": self.word_acc_metric.result(),
+            f"top_{self.k}_word_acc": self.top_k_acc_metric.result()
         }
 
     # define metrics
     @property
     def metrics(self):
-        return [self.loss_metrics, self.word_loss_metric, self.deep_loss_metric, self.word_acc_metric]
+        return [self.loss_metrics,
+                self.word_loss_metric,
+                self.deep_loss_metric,
+                self.word_acc_metric,
+                self.top_k_acc_metric]
