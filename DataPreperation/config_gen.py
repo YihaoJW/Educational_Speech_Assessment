@@ -4,9 +4,9 @@ from pathlib import Path
 
 base_feature = ([None, 80], 128, [128, 256, 384, 384], 3, 2)
 base_feature_name = ('input_shape', 'feature_depth', 'channels_list', 'filter_size', 'stack_size')
-dense_feature = ([896], 256, [256, 256], 2)
+dense_feature = ([896], 64, [256, 256], 2)
 dense_feature_name = ('input_shape', 'output_shape', 'channels_list', 'stack_size')
-word_prediction = ([256], 1800, [256, 256], 1)
+word_prediction = ([64], 1800, [128, 128], 1)
 word_prediction_name = ('input_shape', 'output_shape', 'channels_list', 'stack_size')
 base_ratio = 125
 margin = 0.4

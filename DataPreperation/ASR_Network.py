@@ -98,16 +98,17 @@ def residual_block_stack_fc(x, channels, stack_size):
     return x
 
 
-# %%
-# Create a dense residual network
-def build_dense_network(input_shape, output_shape, channels_list, filter_size, stack_size):
-    x = tf.keras.Input(input_shape)
-    y = residual_block_stack(x, channels_list[0], filter_size, stack_size)
-    for i in range(1, len(channels_list)):
-        y = tf.keras.layers.Concatenate(axis=-1)([y, x])
-        y = residual_block_stack(y, channels_list[i], filter_size, stack_size)
-    y = tf.keras.layers.Conv1D(output_shape, 1, padding='same')(y)
-    return tf.keras.Model(x, y)
+# Define a min max clip constraint
+class MinMaxClip(tf.keras.constraints.Constraint):
+    def __init__(self, min_value, max_value):
+        self.min_value = min_value
+        self.max_value = max_value
+
+    def __call__(self, w):
+        return tf.clip_by_value(w, self.min_value, self.max_value)
+
+    def get_config(self):
+        return {'min_value': self.min_value, 'max_value': self.max_value}
 
 
 # Define a Keras layers that perform information pooling
@@ -166,7 +167,7 @@ class AutoLossBalancing(tf.keras.layers.Layer):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.auto_balancing = self.add_weight('auto_balancing', shape=(2,), dtype=tf.float32, trainable=True,
-                                              initializer='zeros')
+                                              initializer='zeros', constraint=MinMaxClip(-5, 5))
 
     def call(self, inputs, training=None, mask=None):
         word_loss, deep_loss = inputs[0], inputs[1]
@@ -181,7 +182,7 @@ class ASR_Network(tf.keras.Model):
         super().__init__(**kwargs)
         self.base_network = self.create_base_network(**base_feature)
         self.deep_feature = self.build_dense_network(**dense_feature)
-        self.word_prediction = self.build_dense_network(**word_prediction)
+        self.word_prediction = self.build_dense_network_dp(**word_prediction)
         pooling_ratios = [base_ratio / 2 ** i for i in range(len(base_feature['channels_list']))]
         self.pooling = InformPooling(len(pooling_ratios), pooling_ratios)
         # define metrics
@@ -211,6 +212,18 @@ class ASR_Network(tf.keras.Model):
         for i in range(len(channels_list)):
             y = residual_block_stack_fc(y, channels_list[i], stack_size)
         y = tf.keras.layers.Dense(output_shape)(y)
+        return tf.keras.Model(x, y)
+
+    @staticmethod
+    def build_dense_network_dp(input_shape, output_shape, channels_list, stack_size):
+        x = tf.keras.Input(input_shape)
+        y = x
+        for i in range(len(channels_list)):
+            y = residual_block_stack_fc(y, channels_list[i], stack_size)
+        y_d = tf.keras.layers.Dropout(0.10)(y)
+        y_d = tf.keras.layers.Dense(output_shape)(y_d)
+        y = tf.keras.layers.Dense(output_shape)(y)
+        y = tf.keras.layers.Add()([y, y_d])
         return tf.keras.Model(x, y)
 
     @staticmethod
