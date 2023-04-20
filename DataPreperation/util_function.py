@@ -16,7 +16,7 @@ def init_tensorboard(log_dir):
     log_dir = Path(log_dir)
     if not log_dir.exists():
         log_dir.mkdir(parents=True)
-    name = log_dir.parent.name
+    name = 'ASR_Voice_' + str(log_dir.parent.name)
     # add time in to name
     describe = str(name) + '_' + time.strftime('%Y-%m-%d_%H:%M:%S', time.localtime(time.time()))
     command = f"tensorboard dev upload --logdir {str(log_dir)} --name {str(name)} --description {str(describe)} --verbose 0"

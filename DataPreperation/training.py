@@ -134,6 +134,21 @@ if __name__ == '__main__':
     print("manual debug: test the network")
     network.evaluate(dst_test)
     print("manual debug: data pipe set, about to train")
+    # Check if tensorboard is up
+    if tb_process.poll() is None:
+        print("manual debug: tensorboard is up")
+    else:
+        print("manual debug: tensorboard is down")
+        # print the error message
+        tb_process.terminate()
+        time.sleep(5)
+        tb_process.kill()
+        # get communication from the process print error to stderr and output to stdout
+        tb_out, tb_err = tb_process.communicate()
+        print(tb_out, file=sys.stdout)
+        print(tb_err, file=sys.stderr)
+
+    print("manual debug: start training")
     network.fit(dst_train,
                 epochs=train_config['epoch'],
                 validation_data=dst_test,
