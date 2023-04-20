@@ -168,8 +168,8 @@ class AutoLossBalancing(tf.keras.layers.Layer):
         self.auto_balancing = self.add_weight('auto_balancing', shape=(2,), dtype=tf.float32, trainable=True,
                                               initializer='zeros')
 
-    def call(self, inputs, training=None, mask=None):
-        word_loss, deep_loss = inputs
+    def call(self, inputs, training=False, mask=None):
+        word_loss, deep_loss = inputs[0], inputs[1]
         weighted_loss = tf.reduce_sum(
             (1 / (tf.exp(self.auto_balancing)) ** 2) * tf.stack([word_loss, deep_loss / 2], axis=0))
         total_loss = weighted_loss + tf.reduce_sum(self.auto_balancing)
@@ -308,7 +308,7 @@ class ASR_Network(tf.keras.Model):
             pair_data = self.compute_pair(x, training=True)
             avg_word_loss, deep_loss = self.compute_loss_pair(pair_data, word_reference)
             # compute the total loss
-            total_loss = self.auto_balancing_layer(avg_word_loss, deep_loss)
+            total_loss = self.auto_balancing_layer(avg_word_loss, deep_loss, training=True)
         # compute the gradient
         gradients = tape.gradient(total_loss, self.trainable_variables)
         # apply the gradient
@@ -336,7 +336,7 @@ class ASR_Network(tf.keras.Model):
         pair_data = self.compute_pair(x, training=False)
         avg_word_loss, deep_loss = self.compute_loss_pair(pair_data, word_reference)
         # compute the total loss
-        total_loss = self.auto_balancing_layer(avg_word_loss, deep_loss)
+        total_loss = self.auto_balancing_layer(avg_word_loss, deep_loss, training=False)
         # update the metrics
         (student_output, _), (reference_output, _) = pair_data
         self.loss_metrics.update_state(total_loss)
