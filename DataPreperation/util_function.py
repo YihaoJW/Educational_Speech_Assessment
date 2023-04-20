@@ -19,7 +19,7 @@ def init_tensorboard(log_dir):
     name = log_dir.parent.name
     # add time in to name
     describe = str(name) + '_' + time.strftime('%Y-%m-%d_%H:%M:%S', time.localtime(time.time()))
-    command = f"tensorboard dev upload --logdir {str(log_dir)} --name {name} --description {describe} --verbose 0"
+    command = f"tensorboard dev upload --logdir {str(log_dir)} --name {str(name)} --description {str(describe)} --verbose 0"
     process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     time.sleep(5)  # wait for the subprocess to start
     return process
