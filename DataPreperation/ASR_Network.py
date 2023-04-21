@@ -163,6 +163,19 @@ class InformPooling(tf.keras.layers.Layer):
         return ret
 
 
+@tf.function
+def transpose_last_two_axes(tensor):
+    # Get the rank of the tensor
+    rank = len(tensor.shape)
+
+    # Create a permutation list to transpose the last two axes
+    perm = list(range(rank - 2)) + [rank - 1, rank - 2]
+
+    # Transpose the last two axes
+    transposed_tensor = tf.transpose(tensor, perm)
+
+    return transposed_tensor
+
 class AutoLossBalancing(tf.keras.layers.Layer):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -243,13 +256,14 @@ class ASR_Network(tf.keras.Model):
         for idx in tf.range(batch_size):
             va = norm_a[idx]
             vb = norm_b[idx]
-            ra = ref_a[idx]
-            rb = ref_b[idx]
+            ra = ref_a[idx][..., tf.newaxis]
+            rb = ref_b[idx][..., tf.newaxis]
             similarity_matrix = tf.matmul(va, vb, transpose_b=True)
             # compute the mask for the positive samples
-            mask = tf.cast(tf.equal(ra, rb), tf.float32)
+            raw_mask = tf.equal(ra, transpose_last_two_axes(rb))
+            mask = tf.cast(raw_mask, tf.float32)
             # compute the mask for the negative samples
-            mask_neg = tf.cast(tf.not_equal(ra, rb), tf.float32)
+            mask_neg = tf.cast(tf.logical_not(raw_mask), tf.float32)
             # compute the number of positive and negative samples
             num_pos = tf.cast(tf.reduce_sum(mask), tf.float32)
             num_neg = tf.cast(tf.reduce_sum(mask_neg), tf.float32)
