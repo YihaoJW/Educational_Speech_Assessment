@@ -176,6 +176,7 @@ def transpose_last_two_axes(tensor):
 
     return transposed_tensor
 
+
 class AutoLossBalancing(tf.keras.layers.Layer):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

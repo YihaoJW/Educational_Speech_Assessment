@@ -123,8 +123,8 @@ if __name__ == '__main__':
         optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
         network.compile(optimizer=optimizer)
     print("manual debug: network compiled")
-    print("manual debug: test the network")
-    network.evaluate(dst_test)
+    # print("manual debug: test the network")
+    # network.evaluate(dst_test)
     print("manual debug: data pipe set, about to train")
 
     # Launching tensorboard
