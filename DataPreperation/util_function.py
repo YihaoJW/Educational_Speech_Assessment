@@ -6,9 +6,35 @@ from tensorflow.python.keras import layers, activations
 from shutil import rmtree
 
 
-def init_tensorboard(log_dir):
+def generate_sprite_image(image_list, image_size):
+    # Create a TensorFlow dataset from the image list
+    dataset = tf.data.Dataset.from_tensor_slices(image_list)
+    # Load, decode, and resize the images
+    images = dataset.map(lambda path: tf.image.resize(tf.image.decode_image(tf.io.read_file(path)), image_size))
+    # Stack all images into a single tensor
+    stacked_images = tf.stack(list(images), axis=0)
+    # Compute the sprite size
+    sprite_size = int(tf.math.ceil(tf.math.sqrt(len(image_list))))
+    # Compute the sprite shape
+    sprite_shape = (sprite_size * image_size[0], sprite_size * image_size[1], 3)
+    # Create an empty sprite image
+    sprite_image = tf.zeros(sprite_shape, dtype=tf.uint8)
+    # Calculate the indices for all images without using loops
+    rows, cols = tf.meshgrid(tf.range(0, sprite_size * image_size[0], image_size[0]),
+                             tf.range(0, sprite_size * image_size[1], image_size[1]),
+                             indexing='ij')
+    flat_rows = tf.reshape(rows, [-1])[:len(image_list)]
+    flat_cols = tf.reshape(cols, [-1])[:len(image_list)]
+    indices = tf.stack([flat_rows, flat_cols], axis=-1)
+    # Update the sprite image with all images at the same time
+    sprite_image = tf.tensor_scatter_nd_update(sprite_image, indices, stacked_images)
+    return sprite_image
+
+
+def init_tensorboard(log_dir, name=None):
     """
     initialize tensorboard session
+    :param name: Name for Tensorboard name
     :param log_dir:
     :return:
     """
@@ -16,7 +42,12 @@ def init_tensorboard(log_dir):
     log_dir = Path(log_dir)
     if not log_dir.exists():
         log_dir.mkdir(parents=True)
-    name = 'ASR_Voice_' + str(log_dir.parent.parent.name)
+    # if name is not given use 'ASR_Voice_' + str(log_dir.parent.parent.name) else use ASR_Voice_ + name
+    if name is None:
+        name = 'ASR_Voice_' + str(log_dir.parent.parent.name)
+    else:
+        name = 'ASR_Voice_' + str(name)
+
     # add time in to name
     describe = str(name) + '_' + time.strftime('%Y-%m-%d_%H:%M:%S', time.localtime(time.time()))
     command = f"tensorboard dev upload --logdir {str(log_dir)} --name {str(name)} --description {str(describe)} --verbose 0"
