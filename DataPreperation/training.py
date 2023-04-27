@@ -43,6 +43,8 @@ if __name__ == '__main__':
     parser.add_argument('--retrain', default=False, action='store_true')
     # if you use distributed training default is False action is store_true
     parser.add_argument('--distributed', action='store_true', default=False)
+    # add name of for current run default is None
+    parser.add_argument('--name', type=str, default=None)
     args = parser.parse_args()
     # load the config
     with open(args.config, 'r') as f:
@@ -130,7 +132,7 @@ if __name__ == '__main__':
     # Launching tensorboard
     tb_process = None
     try:
-        tb_process = init_tensorboard(log_dir=config['model_storage']['tensorboard_path'])
+        tb_process = init_tensorboard(log_dir=config['model_storage']['tensorboard_path'], name=args.name)
         print(f"manual debug: tensorboard upload at {config['model_storage']['tensorboard_path']}")
     except Exception as e:
         print(e, file=sys.stderr)

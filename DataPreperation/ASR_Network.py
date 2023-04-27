@@ -75,13 +75,16 @@ def build_network(input_shape, output_shape, channels_list, filter_size, stack_s
 
 
 # Define a residual block that use fully connected layer
-def residual_block_fc(x, channels):
+def residual_block_fc(x, channels, dropout_rate=-1.):
     x_input = x
     # Residual block start Normalize, Activate, and Convolution
+    if dropout_rate > 0.0:
+        x = tf.keras.layers.Dropout(dropout_rate)(x)
     x = tf.keras.layers.BatchNormalization()(x)
     x = tf.keras.layers.Activation('relu')(x)
     x = tf.keras.layers.Dense(channels)(x)
-
+    if dropout_rate > 0.0:
+        x = tf.keras.layers.Dropout(dropout_rate)(x)
     x = tf.keras.layers.BatchNormalization()(x)
     x = tf.keras.layers.Activation('relu')(x)
     x = tf.keras.layers.Dense(channels)(x)
@@ -91,10 +94,10 @@ def residual_block_fc(x, channels):
 
 # %%
 # Build a stack for fully connected layer
-def residual_block_stack_fc(x, channels, stack_size):
+def residual_block_stack_fc(x, channels, stack_size, dropout_rate=-1.):
     x = tf.keras.layers.Dense(channels)(x)
     for i in range(stack_size):
-        x = residual_block_fc(x, channels)
+        x = residual_block_fc(x, channels, dropout_rate)
     return x
 
 
@@ -232,11 +235,8 @@ class ASR_Network(tf.keras.Model):
         x = tf.keras.Input(input_shape)
         y = x
         for i in range(len(channels_list)):
-            y = residual_block_stack_fc(y, channels_list[i], stack_size)
-        y_d = tf.keras.layers.Dropout(0.10)(y)
-        y_d = tf.keras.layers.Dense(output_shape)(y_d)
+            y = residual_block_stack_fc(y, channels_list[i], stack_size, dropout_rate=0.2)
         y = tf.keras.layers.Dense(output_shape)(y)
-        y = tf.keras.layers.Add()([y, y_d])
         return tf.keras.Model(x, y)
 
     @staticmethod
