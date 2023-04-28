@@ -152,11 +152,19 @@ if __name__ == '__main__':
         print(tb_err, file=sys.stderr)
 
     print("manual debug: start training")
-
-    network.fit(dst_train,
-                epochs=train_config['epoch'],
-                validation_data=dst_test,
-                callbacks=[tensorboard_callback, checkpoint_callback, backup_callback])
+    attempt = 0
+    while True:
+        attempt += 1
+        try:
+            network.fit(dst_train,
+                        epochs=train_config['epoch'],
+                        validation_data=dst_test,
+                        callbacks=[tensorboard_callback, checkpoint_callback, backup_callback])
+            print("manual debug: Training completed successfully.")
+            break
+        except Exception as e:
+            print(f"Error occurred during training: {e}", file=sys.stderr)
+            print(f"manual debug: the {attempt} failed Retrying training...")
 
     # End Tensorboard if tb_process is not None
     if tb_process is not None:
