@@ -2,20 +2,22 @@ from yaml import safe_dump
 import argparse
 from pathlib import Path
 
-base_feature = ([None, 80], 128, [128, 192,256, 384], 3, 2)
+base_feature = ([None, 80], 128, [128, 192, 256, 384], 3, 2)
 base_feature_name = ('input_shape', 'feature_depth', 'channels_list', 'filter_size', 'stack_size')
-dense_feature = ([704], 32, [256, 256], 2)
+dense_feature = ([704], 64, [256, 256], 2)
 dense_feature_name = ('input_shape', 'output_shape', 'channels_list', 'stack_size')
-word_prediction = ([64], 1800, [128, 128], 1)
+word_prediction = ([64], 1800, [256, 512], 1)
 word_prediction_name = ('input_shape', 'output_shape', 'channels_list', 'stack_size')
 base_ratio = 125
 margin = 0.4
+dropout = 0.2
 # generate a dictionary to store the configuration
 config = {'model_setting': {'base_feature': dict(zip(base_feature_name, base_feature)),
                             'dense_feature': dict(zip(dense_feature_name, dense_feature)),
                             'word_prediction': dict(zip(word_prediction_name, word_prediction)),
                             'base_ratio': base_ratio,
-                            'margin': margin},
+                            'margin': margin,
+                            'dropout_rate': dropout},
           'model_storage': {'model_ckpt': 'checkpoint/{epoch:06d}_{val_loss:.2f}.ckpt',
                             'model_restore': 'backup/model.ckpt',
                             'tensorboard_path': 'tensorboard/'},
@@ -23,7 +25,7 @@ config = {'model_setting': {'base_feature': dict(zip(base_feature_name, base_fea
                                'epoch': 1000,
                                'learning_rate': {'initial': 0.001,
                                                  'decay': 0.1,
-                                                 'decay_step': 100},
+                                                 'decay_step': 16000},
                                },
           'data_location': {'data_record': 'Tensorflow_DataRecord/Student_Answer_Record.tfrecord',
                             'siri_voice': 'Siri_Related/Siri_Reference_Sample',

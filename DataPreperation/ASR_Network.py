@@ -10,25 +10,29 @@ from util_function import inform_pooling, GatedXVector, PositionEncoding1D
 
 
 # A function that generate a residual Block using separable convolution
-def residual_block(x, channels, filter_size):
+def residual_block(x, channels, filter_size, dropout_rate=-1.0):
     x_input = x
     # Residual block start Normalize, Activate, and Convolution
     x = tf.keras.layers.BatchNormalization()(x)
     x = tf.keras.layers.Activation('relu')(x)
     x = tf.keras.layers.SeparableConv1D(channels, filter_size, padding='same')(x)
+    if dropout_rate > 0:
+        x = tf.keras.layers.Dropout(dropout_rate)(x)
 
     x = tf.keras.layers.BatchNormalization()(x)
     x = tf.keras.layers.Activation('relu')(x)
     x = tf.keras.layers.SeparableConv1D(channels, filter_size, padding='same')(x)
+    if dropout_rate > 0:
+        x = tf.keras.layers.Dropout(dropout_rate)(x)
 
     return tf.keras.layers.Add()([x_input, x])
 
 
 # Build a Convolutional with to adjust the input to the residual block and apply several residual block
-def residual_block_stack(x, channels, filter_size, stack_size):
+def residual_block_stack(x, channels, filter_size, stack_size, dropout_rate=-1.0):
     x = tf.keras.layers.Conv1D(channels, filter_size, padding='same')(x)
     for i in range(stack_size):
-        x = residual_block(x, channels, filter_size)
+        x = residual_block(x, channels, filter_size, dropout_rate)
     return x
 
 
@@ -46,12 +50,12 @@ class CutConcatenate(tf.keras.layers.Concatenate):
 
 
 # Function build a U-Net
-def build_unet(x, output_shape, channels_list, filter_size, stack_size):
+def build_unet(x, output_shape, channels_list, filter_size, stack_size, dropout_rate=-1.0):
     # Build the encoder
     encoder = []
     decoder = []
     for i in range(len(channels_list)):
-        x = residual_block_stack(x, channels_list[i], filter_size, stack_size)
+        x = residual_block_stack(x, channels_list[i], filter_size, stack_size, dropout_rate)
         encoder.append(x)
         if i < len(channels_list) - 1:
             x = tf.keras.layers.AvgPool1D(2)(x)
@@ -60,7 +64,7 @@ def build_unet(x, output_shape, channels_list, filter_size, stack_size):
         # Stride 2 convolution to upsample
         x = tf.keras.layers.Conv1DTranspose(channels_list[i], 4, strides=2, padding='valid')(x)
         x = CutConcatenate(axis=-1)([encoder[i], x])
-        x = residual_block_stack(x, channels_list[i], filter_size, stack_size)
+        x = residual_block_stack(x, channels_list[i], filter_size, stack_size, dropout_rate)
         decoder.append(x)
     # Build the output
     x = tf.keras.layers.Conv1D(output_shape, 1, padding='same')(x)
@@ -68,9 +72,9 @@ def build_unet(x, output_shape, channels_list, filter_size, stack_size):
 
 
 # Build a Network
-def build_network(input_shape, output_shape, channels_list, filter_size, stack_size):
+def build_network(input_shape, output_shape, channels_list, filter_size, stack_size, dropout_rate=-1.0):
     x = tf.keras.Input(input_shape)
-    y, maps = build_unet(x, output_shape, channels_list, filter_size, stack_size)
+    y, maps = build_unet(x, output_shape, channels_list, filter_size, stack_size, dropout_rate)
     return tf.keras.Model(x, y)
 
 
@@ -194,11 +198,21 @@ class AutoLossBalancing(tf.keras.layers.Layer):
 
 
 class ASR_Network(tf.keras.Model):
-    def __init__(self, base_feature, dense_feature, word_prediction, base_ratio, batch_num, margin, k_top=5, **kwargs):
+    def __init__(self,
+                 base_feature,
+                 dense_feature,
+                 word_prediction,
+                 base_ratio,
+                 batch_num,
+                 margin,
+                 k_top=5,
+                 dropout_rate=0.2,
+                 **kwargs):
+
         super().__init__(**kwargs)
-        self.base_network = self.create_base_network(**base_feature)
-        self.deep_feature = self.build_dense_network(**dense_feature)
-        self.word_prediction = self.build_dense_network_dp(**word_prediction)
+        self.base_network = self.create_base_network(dropout_rate=dropout_rate, **base_feature)
+        self.deep_feature = self.build_dense_network(dropout_rate=dropout_rate, **dense_feature)
+        self.word_prediction = self.build_dense_network(dropout_rate=dropout_rate, **word_prediction)
         pooling_ratios = [base_ratio / 2 ** i for i in range(len(base_feature['channels_list']))]
         self.pooling = InformPooling(len(pooling_ratios), pooling_ratios)
         # define metrics
@@ -216,26 +230,17 @@ class ASR_Network(tf.keras.Model):
         self.auto_balancing_layer = AutoLossBalancing(name='auto_loss_balancing')
 
     @staticmethod
-    def create_base_network(input_shape, feature_depth, channels_list, filter_size, stack_size):
+    def create_base_network(input_shape, feature_depth, channels_list, filter_size, stack_size, dropout_rate=-1.0):
         x = tf.keras.Input(input_shape)
-        y, maps = build_unet(x, feature_depth, channels_list, filter_size, stack_size)
+        y, maps = build_unet(x, feature_depth, channels_list, filter_size, stack_size,dropout_rate=dropout_rate)
         return tf.keras.Model(x, [y, maps])
 
     @staticmethod
-    def build_dense_network(input_shape, output_shape, channels_list, stack_size):
+    def build_dense_network(input_shape, output_shape, channels_list, stack_size, dropout_rate=-1.0):
         x = tf.keras.Input(input_shape)
         y = x
         for i in range(len(channels_list)):
-            y = residual_block_stack_fc(y, channels_list[i], stack_size)
-        y = tf.keras.layers.Dense(output_shape)(y)
-        return tf.keras.Model(x, y)
-
-    @staticmethod
-    def build_dense_network_dp(input_shape, output_shape, channels_list, stack_size):
-        x = tf.keras.Input(input_shape)
-        y = x
-        for i in range(len(channels_list)):
-            y = residual_block_stack_fc(y, channels_list[i], stack_size, dropout_rate=0.2)
+            y = residual_block_stack_fc(y, channels_list[i], stack_size, dropout_rate=dropout_rate)
         y = tf.keras.layers.Dense(output_shape)(y)
         return tf.keras.Model(x, y)
 
