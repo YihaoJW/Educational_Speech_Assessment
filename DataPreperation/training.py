@@ -5,7 +5,7 @@ from DataPipe import DataPipeFactory
 import argparse
 import sys
 import time
-from util_function import init_tensorboard, path_resolve
+from util_function import init_tensorboard, path_resolve, EmergencyExit
 
 
 def unpack(d):
@@ -69,7 +69,8 @@ if __name__ == '__main__':
                                                              save_weights_only=True,
                                                              save_best_only=True,
                                                              monitor='val_loss')
-    backup_callback = tf.keras.callbacks.BackupAndRestore(backup_dir=callback_config['model_restore'])
+    backup_callback = tf.keras.callbacks.BackupAndRestore(backup_dir=callback_config['model_restore'],
+                                                          delete_checkpoint=False)
     # train the model
     train_config = config['training_setting']
     # set datapipe to final state
@@ -162,6 +163,10 @@ if __name__ == '__main__':
                         callbacks=[tensorboard_callback, checkpoint_callback, backup_callback])
             print("manual debug: Training completed successfully.")
             break
+        except EmergencyExit as e:
+            print(f"EmergencyExit occurred during training: {e}", file=sys.stderr)
+            print(f"manual debug: EmergencyExit occurred during training: {e}")
+            sys.exit(5)
         except Exception as e:
             print(f"Error occurred during training: {e}", file=sys.stderr)
             print(f"manual debug: the {attempt} failed Retrying training...")

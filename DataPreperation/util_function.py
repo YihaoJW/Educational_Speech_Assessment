@@ -4,6 +4,8 @@ from pathlib import Path
 import tensorflow as tf
 from tensorflow.python.keras import layers, activations
 from shutil import rmtree
+import sys, os
+from datetime import datetime, timedelta
 
 
 def generate_sprite_image(image_list, image_size):
@@ -280,3 +282,34 @@ class SelfAttention1DNormReduce(layers.Layer):
 
         Out = self.attention_merge(Q, K, V, training=training)
         return self.Out_Norm(Out, training=training)
+
+
+class EmergencyExit(Exception):
+    """Exception raised for emergency exit in the program."""
+
+    def __init__(self, message="Emergency exit triggered."):
+        self.message = message
+        super().__init__(self.message)
+
+
+# Define a callback that check if EmergencyExit is need to be triggered
+# the init method receive a remain time in minutes, and variable name for the time
+# End time can be read using environment variable default from SLURM, it only checks on training batch start
+class EmergencyExitCallback(tf.keras.callbacks.Callback):
+    def __init__(self, remain_time=45, time_name="SLURM_JOB_END_TIME", *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.remain_time = remain_time
+        self.time_name = time_name
+        self.time_limit_str = os.environ.get(self.time_name, None)
+        if self.time_limit_str is not None:
+            self.time_limit = datetime.strptime(self.time_limit_str, "%Y-%m-%dT%H:%M:%S")
+        else:
+            self.time_limit = None
+
+    def on_train_batch_begin(self, batch, logs=None):
+        if self.time_limit is not None:
+            current_time = datetime.now()
+            remaining_time = self.time_limit - current_time
+            if remaining_time < timedelta(minutes=self.remain_time):
+                raise EmergencyExit(f"Exiting because less than the specified remaining time: {self.remain_time}.")
+
