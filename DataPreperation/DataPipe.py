@@ -184,7 +184,7 @@ class DataPipeFactory:
         return sample_dict
 
     @staticmethod
-    def __map_chosen_index(index: int, main: dict) -> dict:
+    def map_chosen_index(index: int, main: dict) -> dict:
         sample_dict = {'stu_mfcc': main['stu_mfcc'],
                        'ref_mfcc': main['ref_mfcc'][index],
                        'valid_stu_start': main['valid_stu_start'][index],
@@ -197,8 +197,10 @@ class DataPipeFactory:
     @staticmethod
     def __map_interleave(main: dict) -> tf.data.Dataset:
         ref_voice_count = tf.shape(main['ref_mfcc'])[0]
+        # covert dtype to tf.int64
+        ref_voice_count = tf.cast(ref_voice_count, tf.int64)
         indices = tf.data.Dataset.range(ref_voice_count)
-        return indices.map(lambda x: DataPipeFactory.__map_chosen_index(x, main), num_parallel_calls=tf.data.AUTOTUNE)
+        return indices.map(lambda x: DataPipeFactory.map_chosen_index(x, main), num_parallel_calls=tf.data.AUTOTUNE)
 
     def pre_save(self) -> None:
         self.__raw_data.enumerate().save(self.__cache, shard_func=lambda x, y: x % 64)
