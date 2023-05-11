@@ -296,13 +296,14 @@ class EmergencyExit(Exception):
 # the init method receive a remain time in minutes, and variable name for the time
 # End time can be read using environment variable default from SLURM, it only checks on training batch start
 class EmergencyExitCallback(tf.keras.callbacks.Callback):
-    def __init__(self, remain_time=45, time_name="SLURM_JOB_END_TIME", *args, **kwargs):
+    def __init__(self, remain_time=45, time_name="JOB_END_TIME", *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.remain_time = remain_time
         self.time_name = time_name
         self.time_limit_str = os.environ.get(self.time_name, None)
         if self.time_limit_str is not None:
             self.time_limit = datetime.strptime(self.time_limit_str, "%Y-%m-%dT%H:%M:%S")
+            print(f"Time limit is set to {self.time_limit}")
         else:
             self.time_limit = None
 
@@ -312,4 +313,6 @@ class EmergencyExitCallback(tf.keras.callbacks.Callback):
             remaining_time = self.time_limit - current_time
             if remaining_time < timedelta(minutes=self.remain_time):
                 raise EmergencyExit(f"Exiting because less than the specified remaining time: {self.remain_time}.")
+            else:
+                print(f"Remaining time: {remaining_time}")
 
