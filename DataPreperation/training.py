@@ -91,7 +91,7 @@ if __name__ == '__main__':
         print("manual debug: data pipe save/load end")
 
         with strategy.scope():
-            dst_train = train_data.get_batch_data(batch_size=train_config['batch_size'], addition_map=unpack)
+            dst_train = train_data.get_batch_data(batch_size=train_config['batch_size'], interleave=True, addition_map=unpack)
             dst_test = eval_data.get_batch_data(batch_size=train_config['batch_size'], addition_map=unpack)
             learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(lr_config['initial'],
                                                                            lr_config['decay_step'],
