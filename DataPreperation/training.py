@@ -5,7 +5,7 @@ from DataPipe import DataPipeFactory
 import argparse
 import sys
 import time
-from util_function import init_tensorboard, path_resolve, EmergencyExit
+from util_function import init_tensorboard, path_resolve, EmergencyExit, EmergencyExitCallback
 
 
 def unpack(d):
@@ -160,7 +160,7 @@ if __name__ == '__main__':
             network.fit(dst_train,
                         epochs=train_config['epoch'],
                         validation_data=dst_test,
-                        callbacks=[tensorboard_callback, checkpoint_callback, backup_callback])
+                        callbacks=[tensorboard_callback, checkpoint_callback, backup_callback, EmergencyExitCallback(45)])
             print("manual debug: Training completed successfully.")
             break
         except EmergencyExit as e:
