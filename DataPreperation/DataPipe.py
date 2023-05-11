@@ -304,8 +304,8 @@ class DataPipeFactory:
                 .apply(self.__pair_map_handle(self.__pairs, deterministic=deterministic, interleave=interleave)) \
                 .apply(self.__batching_handle(batch_size)) \
                 .map(addition_map,
-                     num_parallel_calls=tf.data.AUTOTUNE, deterministic=deterministic, interleave=interleave) \
-                .prefetch( tf.data.AUTOTUNE)
+                     num_parallel_calls=tf.data.AUTOTUNE, deterministic=deterministic) \
+                .prefetch(tf.data.AUTOTUNE)
         else:
             return self.get_raw_data() \
                 .apply(self.__pair_map_handle(self.__pairs, deterministic=deterministic, interleave=interleave)) \
