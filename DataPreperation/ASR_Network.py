@@ -352,7 +352,7 @@ class ASR_Network(tf.keras.Model):
         self.word_loss_metric.update_state(avg_word_loss)
         self.deep_loss_metric.update_state(deep_loss)
         self.word_acc_metric.update_state(word_reference.flat_values, student_output.flat_values)
-        self.word_acc_metric.update_state(word_reference.flat_values, reference_output.flat_values)
+        # self.word_acc_metric.update_state(word_reference.flat_values, reference_output.flat_values)
         self.top_k_acc_metric.update_state(word_reference.flat_values, student_output.flat_values)
         return {
             "loss": self.loss_metrics.result(),
@@ -376,7 +376,7 @@ class ASR_Network(tf.keras.Model):
         self.word_loss_metric.update_state(avg_word_loss)
         self.deep_loss_metric.update_state(deep_loss)
         self.word_acc_metric.update_state(word_reference.flat_values, student_output.flat_values)
-        self.word_acc_metric.update_state(word_reference.flat_values, reference_output.flat_values)
+        # self.word_acc_metric.update_state(word_reference.flat_values, reference_output.flat_values)
         self.top_k_acc_metric.update_state(word_reference.flat_values, student_output.flat_values)
         return {
             "loss": self.loss_metrics.result(),
