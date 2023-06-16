@@ -52,7 +52,6 @@ class Test_DS_Root:
         return start, duration
 
 
-
 class Test_DS_Factory_Siri(Test_DS_Root):
     """
     Factory class for creating test dataset
