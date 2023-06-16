@@ -117,5 +117,5 @@ if __name__ == "__main__":
         # save the deep feature as a tensor to disk
         d_serialized = tf.io.serialize_tensor(d_feature)
         # save to disk using record_index.tfs, record_index is a tf.string shape (1,)
-        tf.io.write_file(str(Path(config['student_data_setting']['output_path']) / f'{record_index.numpy()[0]}.tfs'),
+        tf.io.write_file(str(Path(config['student_data_setting']['output_path']) / f'{record_index.numpy()[0].decode()}.tfs'),
                          d_serialized)
