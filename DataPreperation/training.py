@@ -19,7 +19,6 @@ def unpack(d):
     duration_f = tf.RaggedTensor.from_tensor(d['valid_ref_duration'], padding=-1.)
 
     # unpack valid_ref_word
-
     words = tf.RaggedTensor.from_tensor(d['valid_ref_word'], padding=-1)
     return ((value_s, (start_s, duration_s)), (value_f, (start_f, duration_f))), words
 
