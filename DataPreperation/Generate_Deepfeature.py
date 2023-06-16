@@ -61,8 +61,8 @@ if __name__ == "__main__":
     # load the config
     with open(args.config, 'r') as f:
         config = safe_load(f)
-    # bath num is for loss calculation, it will not use in the prediction, set it to None as placeholder
-    config['model_setting']['batch_num'] = None
+    # bath num is for loss calculation, it will not use in the prediction, set it to 1 as placeholder
+    config['model_setting']['batch_num'] = 1
     # create the network
     network = DeepFeatureNetwork(config['model_setting'], config['model_storage']['model_ckpt'])
 
