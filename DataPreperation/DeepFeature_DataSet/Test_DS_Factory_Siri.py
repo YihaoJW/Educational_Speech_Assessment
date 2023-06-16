@@ -45,10 +45,10 @@ class Test_DS_Root:
         return log_mel_spectrograms
 
     @staticmethod
-    @tf.function(jit_compile=True)
+    @tf.function
     def unpack(label):
-        start = tf.RaggedTensor.from_tensor(label[:, 0], padding=-1.)
-        duration = tf.RaggedTensor.from_tensor(label[:, 1], padding=-1.)
+        start = tf.RaggedTensor.from_tensor(label[:, :, 0], padding=-1.)
+        duration = tf.RaggedTensor.from_tensor(label[:, :, 1], padding=-1.)
         return start, duration
 
 
