@@ -65,7 +65,7 @@ class Test_DS_Factory_Siri(Test_DS_Root):
     the return dataset contains the mfc of the frame feature and the label of the speaker
     """
 
-    def __init__(self, frame_feature_path, segment_feature_path):
+    def __init__(self, frame_feature_path, segment_feature_path, **kwargs):
         """
         :param frame_feature_path: it's a dir of frame feature of siri
         :param segment_feature_path: it's a dir of segment feature of siri
@@ -111,7 +111,7 @@ class Test_DS_Factory_Student(Test_DS_Root):
     Then we map the base dataset to the final dataset
     """
 
-    def __init__(self, frame_feature_path, segment_feature_path):
+    def __init__(self, frame_feature_path, segment_feature_path, **kwargs):
         """
         :param frame_feature_path: a tensorflow dataset record file
         :param segment_feature_path: a dir to student segment information
