@@ -25,6 +25,7 @@ class DeepFeatureNetwork(tf.keras.Model):
         # Restore the latest checkpoint
         self.network.load_weights(ckpt_path)
 
+    @tf.function
     def call(self, inputs, training=None, mask=None):
         audio, (start, duration) = inputs
         base_output, maps = self.network.base_network(audio, training=training)
@@ -106,7 +107,8 @@ if __name__ == "__main__":
         # save the deep feature as a tensor to disk
         d_serialized = tf.io.serialize_tensor(d_feature)
         # save to disk using passage_id.tfs, passage_id is a int64
-        tf.io.write_file(str(Path(config['siri_data_setting']['output_path']) / f'{passage_id.numpy()}.tfs'), d_serialized)
+        tf.io.write_file(str(Path(config['siri_data_setting']['output_path']) / f'{passage_id.numpy()}.tfs'),
+                         d_serialized)
 
     # iterate though student dataset and save the deep feature using name
     # the batch size is 1, save it using record_index which is an array of tf.string shape (1,)
@@ -115,4 +117,5 @@ if __name__ == "__main__":
         # save the deep feature as a tensor to disk
         d_serialized = tf.io.serialize_tensor(d_feature)
         # save to disk using record_index.tfs, record_index is a tf.string shape (1,)
-        tf.io.write_file(str(Path(config['student_data_setting']['output_path']) / f'{record_index.numpy()[0]}.tfs'), d_serialized)
+        tf.io.write_file(str(Path(config['student_data_setting']['output_path']) / f'{record_index.numpy()[0]}.tfs'),
+                         d_serialized)
