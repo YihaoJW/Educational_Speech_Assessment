@@ -42,6 +42,7 @@ class DataPipeFactory:
         e = tf.io.parse_single_example(serialized_example, features)
         # Convert the serialized tensor to tensor
         e['AudioSegment'] = tf.io.parse_tensor(e['AudioSegment'], out_type=tf.int16)
+        e['RecordName'] = tf.io.parse_tensor(e['RecordName'], tf.string)
         e['Sentence'] = tf.io.parse_tensor(e['Sentence'], out_type=tf.int64)
         e['WordStart'] = tf.io.parse_tensor(e['WordStart'], out_type=tf.float32)
         e['WordDuration'] = tf.io.parse_tensor(e['WordDuration'], out_type=tf.float32)
@@ -102,7 +103,7 @@ class DataPipeFactory:
         return self.__raw_data
 
     @staticmethod
-    @tf.function
+    @tf.function(jit_compile=True)
     def get_mfcc(pcm: int,
                  sample_rate: int = 16000,
                  frame_length: int = 1024) -> tf.float32:
