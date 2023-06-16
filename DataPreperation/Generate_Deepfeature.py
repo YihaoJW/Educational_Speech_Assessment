@@ -25,7 +25,7 @@ class DeepFeatureNetwork(tf.keras.Model):
         # Restore the latest checkpoint
         self.network.load_weights(ckpt_path)
 
-    @tf.function
+    @tf.function(reduce_retracing=True)
     def call(self, inputs, training=None, mask=None):
         audio, (start, duration) = inputs
         base_output, maps = self.network.base_network(audio, training=training)
