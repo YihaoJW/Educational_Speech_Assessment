@@ -119,7 +119,13 @@ class DataPipeFactory:
                                                   upper_edge_hertz)
         mel_spectrograms = tf.einsum('...t,tb->...b', spectrograms, linear_to_mel_weight_matrix)
         log_mel_spectrograms = tf.math.log(mel_spectrograms + 1e-6)
-        return log_mel_spectrograms
+        # Take DCT to decorrelate the dimension across frequency axis.
+        log_mel_spectrograms_dct = tf.signal.dct(log_mel_spectrograms, type=2, axis=-1, norm='ortho')
+        # Normalize to remove background noise and room, device effects.
+        log_mel_spectrograms_dct_zm = log_mel_spectrograms_dct - tf.reduce_mean(log_mel_spectrograms_dct, axis=-1, keepdims=True)
+        # Convert back to log mel spectrograms by applying inverse DCT.
+        log_mel_spectrograms_dct_zm_idct = tf.signal.idct(log_mel_spectrograms_dct_zm, type=2, axis=-1, norm='ortho')
+        return log_mel_spectrograms_dct_zm_idct
 
     @staticmethod
     def __pair_mapping(main: dict, counter: dict) -> dict:
