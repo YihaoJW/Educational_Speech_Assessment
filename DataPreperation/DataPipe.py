@@ -42,13 +42,13 @@ class DataPipeFactory:
         e = tf.io.parse_single_example(serialized_example, features)
         # Convert the serialized tensor to tensor
         e['AudioSegment'] = tf.io.parse_tensor(e['AudioSegment'], out_type=tf.int16)
-        e['RecordName'] = tf.io.parse_tensor(e['RecordName'], tf.string)
+        e['RecordName'] = tf.io.parse_tensor(e['RecordName'], tf.string)[tf.newaxis, ...]
         e['Sentence'] = tf.io.parse_tensor(e['Sentence'], out_type=tf.int64)
         e['WordStart'] = tf.io.parse_tensor(e['WordStart'], out_type=tf.float32)
         e['WordDuration'] = tf.io.parse_tensor(e['WordDuration'], out_type=tf.float32)
         e['MatchSegment'] = tf.io.parse_tensor(e['MatchSegment'], out_type=tf.int64)
         e['MatchReference'] = tf.io.parse_tensor(e['MatchReference'], out_type=tf.int64)
-        passage_id = tf.strings.split(e['RecordName'], sep='_')[3]
+        passage_id = tf.strings.split(e['RecordName'], sep='_').values[3]
         # convert tf.string to int
         passage_id = tf.strings.to_number(passage_id, out_type=tf.int32) % 100000
         # convert to tf.string
@@ -63,8 +63,8 @@ class DataPipeFactory:
 
         def created_map(e: Dict) -> Dict:
             a = {'stu_mfcc': get_mfcc(e['AudioSegment'], e['SampleRate'])}
-            ref_audio = tf.io.parse_tensor(tf.io.read_file(ref_audio_path + '/' + e['passage_id'] + '.tfs'),
-                                           out_type=tf.int16)
+            file_path = ref_audio_path + '/' + e['passage_id'] + '.tfs'
+            ref_audio = tf.io.parse_tensor(tf.io.read_file(file_path), out_type=tf.int16)
             a['ref_mfcc'] = get_mfcc(ref_audio, e['SampleRate'])
             passage_word = tf.io.parse_tensor(
                 tf.io.read_file(word_information_path + '/' + e['passage_id'] + '_word.tfs'), out_type=tf.int64)
