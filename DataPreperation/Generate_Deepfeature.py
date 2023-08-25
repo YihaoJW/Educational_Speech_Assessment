@@ -53,7 +53,7 @@ if __name__ == "__main__":
         - output_path: the path which is dir for the output feature
     4. student_data_setting: the data setting for the student voice
         - frame_feature_path: the path which is a tensorflow dataset record for the frame feature
-        - segment_feature_path: the path which is a dir  for the segment feature
+        - segment_feature_path: the path which is a dir for the segment feature
         - output_path: the path which is a dir for the output feature
     """
     parser = argparse.ArgumentParser()

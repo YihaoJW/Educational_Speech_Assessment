@@ -3,6 +3,7 @@ import numpy as np
 from pathlib import Path
 from argparse import ArgumentParser
 
+
 def read_save_handle(read_path: Path, write_path: Path) -> str:
     """
     Read the data from read_path and save it to write_path
@@ -29,7 +30,7 @@ def read_save_handle(read_path: Path, write_path: Path) -> str:
 
 def write_path_generator(write_prefix: Path, read_file: Path) -> Path:
     """
-    Generate the write path by appending the read_file name (without an extension) to write_prefix
+    Generate the written path by appending the read_file name (without an extension) to write_prefix
     :param write_prefix: an PathLib path to the directory to be written
     :param read_file: a PathLib path to the file to be read
     :return: write_path: a PathLib path to the file to be written
