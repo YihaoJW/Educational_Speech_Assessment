@@ -5,7 +5,7 @@ from DataPipe import DataPipeFactory
 import argparse
 import sys
 import time
-from util_function import init_tensorboard, path_resolve, EmergencyExit, EmergencyExitCallback
+from util_function import init_tensorboard, path_resolve, EmergencyExit, EmergencyExitCallback, load_config
 
 
 def unpack(d):
@@ -46,8 +46,10 @@ if __name__ == '__main__':
     parser.add_argument('--name', type=str, default=None)
     args = parser.parse_args()
     # load the config
-    with open(args.config, 'r') as f:
-        config = safe_load(f)
+    # with open(args.config, 'r') as f:
+    #     config = safe_load(f)
+    config = load_config(args.config)
+
     path_resolve(config, args)
     print("manual debug: config loaded")
     # set the batch size

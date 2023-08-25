@@ -1,13 +1,10 @@
-import subprocess
 import time
 from pathlib import Path
 import tensorflow as tf
 from tensorflow.python.keras import layers, activations
 from shutil import rmtree
-import sys, os
+import sys, os, subprocess,yaml
 from datetime import datetime, timedelta
-
-
 def generate_sprite_image(image_list, image_size):
     # Create a TensorFlow dataset from the image list
     dataset = tf.data.Dataset.from_tensor_slices(image_list)
@@ -316,3 +313,16 @@ class EmergencyExitCallback(tf.keras.callbacks.Callback):
             else:
                 print(f"Remaining time: {remaining_time}")
 
+
+def load_config(file_path):
+    # Read the YAML file into a string
+    with open(file_path, 'r') as f:
+        config_str = f.read()
+
+    # Replace environment variables using echo in a shell
+    config_str = subprocess.check_output(['bash', '-c', f"echo '{config_str}'"]).decode()
+
+    # Parse the resulting string back into a Python dict
+    config = yaml.safe_load(config_str)
+
+    return config
