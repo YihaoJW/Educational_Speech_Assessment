@@ -233,7 +233,7 @@ class ASR_Network(tf.keras.Model):
     @staticmethod
     def create_base_network(input_shape, feature_depth, channels_list, filter_size, stack_size, dropout_rate=-1.0):
         x = tf.keras.Input(input_shape)
-        y, maps = build_unet(x, feature_depth, channels_list, filter_size, stack_size,dropout_rate=dropout_rate)
+        y, maps = build_unet(x, feature_depth, channels_list, filter_size, stack_size, dropout_rate=dropout_rate)
         return tf.keras.Model(x, [y, maps])
 
     @staticmethod
@@ -280,10 +280,26 @@ class ASR_Network(tf.keras.Model):
             avg_sim_pos = tf.reduce_sum(tf.multiply(similarity_matrix, mask)) / num_pos
             # compute the average similarity for the negative samples
             avg_sim_neg = tf.reduce_sum(tf.multiply(similarity_matrix, mask_neg)) / num_neg
-            # compute the max similarity for the positive samples
-            min_sim_pos = tf.reduce_min(tf.multiply(similarity_matrix, mask))
-            # compute the min similarity for the negative samples
-            max_sim_neg = tf.reduce_max(tf.multiply(similarity_matrix, mask_neg))
+
+            # Set masked values for positive samples to 1
+            min_sim_pos_masked = tf.where(raw_mask, similarity_matrix, 1.0)
+            # Set masked values for negative samples to -1
+            max_sim_neg_masked = tf.where(tf.math.logical_not(raw_mask), similarity_matrix, -1.0)
+
+            # If raw_mask has any True value, compute the min for positive samples, else return 0
+            min_sim_pos = tf.where(tf.math.reduce_any(raw_mask),
+                                   tf.reduce_min(min_sim_pos_masked),
+                                   tf.constant(0.0, dtype=tf.float32))
+
+            # If the logical NOT of raw_mask has any True value, compute the max for negative samples, else return 0
+            max_sim_neg = tf.where(tf.math.reduce_any(tf.math.logical_not(raw_mask)),
+                                   tf.reduce_max(max_sim_neg_masked),
+                                   tf.constant(0.0, dtype=tf.float32))
+
+            # # compute the max similarity for the positive samples
+            # min_sim_pos = tf.reduce_min(tf.multiply(similarity_matrix, mask))
+            # # compute the min similarity for the negative samples
+            # max_sim_neg = tf.reduce_max(tf.multiply(similarity_matrix, mask_neg))
             # compute the average loss with margin
             loss_avg = tf.maximum(0., margin - avg_sim_pos + avg_sim_neg)
             # compute min_max loss with margin

@@ -242,10 +242,12 @@ def sequence_matching(student_deep_feature: np.ndarray,
 def get_information_for_all(search_dir: Path,
                             siri_deep_feature_prefix: Path,
                             word_tagging_prefix: Path,
+                            student_asr_plist_prefix: Path,
                             csv_result: Path) -> pd.DataFrame:
     processed_case = []
     new_matched_adj_count = []
     old_matched_adj_count = []
+    word_correct_per_minutes_store = []
     df_old = pd.read_csv(csv_result, index_col=0, compression='gzip')
     for record in search_dir.glob('*.npy'):
         case_id = record.stem
@@ -275,12 +277,25 @@ def get_information_for_all(search_dir: Path,
                 max_fitness = fitness_score
                 max_id = i
                 max_adjusted_matched_count = len(matched_string.split(' '))
+                max_matched_indices = matched_indices
         processed_case.append(case_id)
+        # Read the student ASR plist file
+        student_asr_plist = load(open(student_asr_plist_prefix / f'{case_id}.wav.plist', 'rb'))
+        # filter the student ASR plist to only contain the matched indices
+        student_asr_plist_match = [student_asr_plist[index_id] for index_id in max_matched_indices]
+        # Calculate the time difference between the first and last word and convert to minutes from seconds
+        time_difference = ((student_asr_plist_match[-1]['tTime'] + student_asr_plist_match[-1]['tDuration'])
+                           - student_asr_plist_match[0]['tTime']) / 60
+        # Calculate word matched per minute
+        word_correct_per_minutes = max_adjusted_matched_count / time_difference
+        word_correct_per_minutes_store.append(word_correct_per_minutes)
         new_matched_adj_count.append(max_adjusted_matched_count)
         old_matched_adj_count.append(len(old_matched_string))
     # create a dataframe using processed as index, and new_matched_adj_count, old_matched_adj_count as columns
     df = pd.DataFrame({'new_matched_adj_count': new_matched_adj_count,
-                       'old_matched_adj_count': old_matched_adj_count}, index=processed_case)
+                       'old_matched_adj_count': old_matched_adj_count,
+                       'word_correct_per_minutes': word_correct_per_minutes_store
+                       }, index=processed_case)
     # calculate the difference between new_matched_adj_count and old_matched_adj_count
     df['difference'] = df['new_matched_adj_count'] - df['old_matched_adj_count']
     return df
@@ -288,62 +303,70 @@ def get_information_for_all(search_dir: Path,
 
 # %%
 # Run the function
-model_name = "Deep_Feature_model_7_Numpy"
+model_name = "Deep_Feature_Numpy"
 search_dir = Path(f"../DataFolder/Student_Response/{model_name}")
 siri_deep_feature_prefix = Path(f"../DataFolder/Siri_Related/{model_name}")
 word_tagging_prefix = Path("../DataFolder/Siri_Related/SiriR")
+student_asr_plist_prefix = Path("../DataFolder/Student_Response/Result")
 old_path_prefix = Path("../DataFolder/Student_Response/Match/result.csv.gz")
-df = get_information_for_all(search_dir, siri_deep_feature_prefix, word_tagging_prefix, old_path_prefix)
+df = get_information_for_all(search_dir,
+                             siri_deep_feature_prefix,
+                             word_tagging_prefix,
+                             student_asr_plist_prefix,
+                             old_path_prefix)
 df2 = df[df['old_matched_adj_count'] != 0]
 
 # score_diff is a column 'difference' in df2 DataFrame
 analyze_score_diff(df2)
-
+# Set name of index column to 'file'
+df2.index.name = 'file'
+# save the result
+df2.to_csv(Path(f'../DataFolder/Student_Response/Save_CSV/Deep_Match_result_{model_name}.csv.gz'), compression='gzip')
 #%%
-# Test Cell
-case_id = 'student_982_passage_34000_553fe870c3878'
-siri_deep_feature_prefix = Path(f"../DataFolder/Siri_Related/{model_name}")
-word_tagging_prefix = Path("../DataFolder/Siri_Related/SiriR")
-single_result = search_dir / f'{case_id}.npy'
-# Previous matching result
-df_old = pd.read_csv(old_path_prefix, index_col=0)
-old_string = df_old.loc[case_id]['result']
-old_matched_string = ' '.join(map(lambda x: x.strip(), re.findall(r'([a-zA-Z\s]+)(?=<0\.\d{2}>)', old_string))).split(' ')
-# read the file name
-passage_id, student_deep_feature, file_name = read_student_deep_feature(single_result)
-# read the siri file
-list_of_word_tagging = read_siri_feature_and_label(passage_id, siri_deep_feature_prefix, word_tagging_prefix)
-# calculate the matching
-# generate all the matching
-max_fitness = 0
-for i in range(len(list_of_word_tagging)):
-    matched_word_tagging, \
-        matched_indices, \
-        matched_similarity_score, \
-        fitness_score, ori\
-        = sequence_matching(student_deep_feature[0], list_of_word_tagging[i], 0.0)
-    matched_string = ' '.join(list(map(lambda x: x['tString'], matched_word_tagging)))
-    # print Siri id and matched string and fitness score (only keep 2 decimal)
-    ref_string = ' '.join(list(map(lambda x: x['tString'], list_of_word_tagging[i])))
-    print(f"Siri id: {i}, \n"
-          f"Fitness Score {fitness_score:.2f}, "
-          f"Matched Count: {len(matched_word_tagging)}, "
-          f"Reference Count:{len(list_of_word_tagging[i])}, "
-          f"Adjusted Matched Count: {len(matched_string.split(' '))}, "
-          f"Adjusted Reference Count: {len(ref_string.split(' '))},\n "
-          f"matched string: \n\t{matched_string}", end='\n\n')
-    if fitness_score > max_fitness:
-        # update the max fitness score
-        max_fitness = fitness_score
-        # save Adjusted Matched Count and Adjusted Reference Count's ID
-        max_fitness_id = i
-        max_adjusted_matched_count = len(matched_string.split(' '))
-# Print Reference String
-ref_string = ' '.join(list(map(lambda x: x['tString'], list_of_word_tagging[max_fitness_id])))
-print(f"Student Response Count: {student_deep_feature[0].shape[0]},\t"
-      f"Previous Matched Count: {len(old_matched_string)},\t"
-      f"Current Matched Count: {max_adjusted_matched_count},\n"
-      f"Reference String: \n\t{ref_string}")
+# # Test Cell
+# case_id = 'student_982_passage_34000_553fe870c3878'
+# siri_deep_feature_prefix = Path(f"../DataFolder/Siri_Related/{model_name}")
+# word_tagging_prefix = Path("../DataFolder/Siri_Related/SiriR")
+# single_result = search_dir / f'{case_id}.npy'
+# # Previous matching result
+# df_old = pd.read_csv(old_path_prefix, index_col=0)
+# old_string = df_old.loc[case_id]['result']
+# old_matched_string = ' '.join(map(lambda x: x.strip(), re.findall(r'([a-zA-Z\s]+)(?=<0\.\d{2}>)', old_string))).split(' ')
+# # read the file name
+# passage_id, student_deep_feature, file_name = read_student_deep_feature(single_result)
+# # read the siri file
+# list_of_word_tagging = read_siri_feature_and_label(passage_id, siri_deep_feature_prefix, word_tagging_prefix)
+# # calculate the matching
+# # generate all the matching
+# max_fitness = 0
+# for i in range(len(list_of_word_tagging)):
+#     matched_word_tagging, \
+#         matched_indices, \
+#         matched_similarity_score, \
+#         fitness_score, ori\
+#         = sequence_matching(student_deep_feature[0], list_of_word_tagging[i], 0.0)
+#     matched_string = ' '.join(list(map(lambda x: x['tString'], matched_word_tagging)))
+#     # print Siri id and matched string and fitness score (only keep 2 decimal)
+#     ref_string = ' '.join(list(map(lambda x: x['tString'], list_of_word_tagging[i])))
+#     print(f"Siri id: {i}, \n"
+#           f"Fitness Score {fitness_score:.2f}, "
+#           f"Matched Count: {len(matched_word_tagging)}, "
+#           f"Reference Count:{len(list_of_word_tagging[i])}, "
+#           f"Adjusted Matched Count: {len(matched_string.split(' '))}, "
+#           f"Adjusted Reference Count: {len(ref_string.split(' '))},\n "
+#           f"matched string: \n\t{matched_string}", end='\n\n')
+#     if fitness_score > max_fitness:
+#         # update the max fitness score
+#         max_fitness = fitness_score
+#         # save Adjusted Matched Count and Adjusted Reference Count's ID
+#         max_fitness_id = i
+#         max_adjusted_matched_count = len(matched_string.split(' '))
+# # Print Reference String
+# ref_string = ' '.join(list(map(lambda x: x['tString'], list_of_word_tagging[max_fitness_id])))
+# print(f"Student Response Count: {student_deep_feature[0].shape[0]},\t"
+#       f"Previous Matched Count: {len(old_matched_string)},\t"
+#       f"Current Matched Count: {max_adjusted_matched_count},\n"
+#       f"Reference String: \n\t{ref_string}")
 
 
 # %%
