@@ -6,6 +6,8 @@ import re
 import pandas as pd
 import scipy.stats as stats
 from sklearn.utils import resample
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 
 def read_siri_feature_and_label(passage_id: int,
@@ -243,11 +245,14 @@ def get_information_for_all(search_dir: Path,
                             siri_deep_feature_prefix: Path,
                             word_tagging_prefix: Path,
                             student_asr_plist_prefix: Path,
-                            csv_result: Path) -> pd.DataFrame:
+                            csv_result: Path,
+                            threshold :float = 0.8) -> pd.DataFrame:
     processed_case = []
     new_matched_adj_count = []
     old_matched_adj_count = []
     word_correct_per_minutes_store = []
+    list_of_match_score = []
+    list_of_unmatch_score = []
     df_old = pd.read_csv(csv_result, index_col=0, compression='gzip')
     for record in search_dir.glob('*.npy'):
         case_id = record.stem
@@ -271,13 +276,15 @@ def get_information_for_all(search_dir: Path,
                 matched_indices, \
                 matched_similarity_score, \
                 fitness_score, ori \
-                = sequence_matching(student_deep_feature[0], list_of_word_tagging[i], 0.0)
+                = sequence_matching(student_deep_feature[0], list_of_word_tagging[i], threshold)
             matched_string = ' '.join(list(map(lambda x: x['tString'], matched_word_tagging)))
             if fitness_score > max_fitness:
                 max_fitness = fitness_score
                 max_id = i
                 max_adjusted_matched_count = len(matched_string.split(' '))
                 max_matched_indices = matched_indices
+                max_result_ori = ori
+                max_matched_similarity_score = matched_similarity_score
         processed_case.append(case_id)
         # Read the student ASR plist file
         student_asr_plist = load(open(student_asr_plist_prefix / f'{case_id}.wav.plist', 'rb'))
@@ -291,6 +298,18 @@ def get_information_for_all(search_dir: Path,
         word_correct_per_minutes_store.append(word_correct_per_minutes)
         new_matched_adj_count.append(max_adjusted_matched_count)
         old_matched_adj_count.append(len(old_matched_string))
+
+        #get matched score
+        matched_score = np.array(max_matched_similarity_score).reshape(-1)
+        unmatched_score = max_result_ori.reshape(-1)
+        # remove all -1 in the unmatched_score
+        unmatched_score = unmatched_score[unmatched_score != -1]
+        # remove matched_score from unmatched_score
+        unmatched_score = unmatched_score[~np.isin(unmatched_score, matched_score)]
+        # save the result
+        list_of_match_score.append(matched_score)
+        list_of_unmatch_score.append(unmatched_score)
+
     # create a dataframe using processed as index, and new_matched_adj_count, old_matched_adj_count as columns
     df = pd.DataFrame({'new_matched_adj_count': new_matched_adj_count,
                        'old_matched_adj_count': old_matched_adj_count,
@@ -298,22 +317,25 @@ def get_information_for_all(search_dir: Path,
                        }, index=processed_case)
     # calculate the difference between new_matched_adj_count and old_matched_adj_count
     df['difference'] = df['new_matched_adj_count'] - df['old_matched_adj_count']
-    return df
+    return df, list_of_match_score, list_of_unmatch_score
 
 
 # %%
 # Run the function
-model_name = "Deep_Feature_Numpy"
+model_name = "Deep_Feature_model_9_Numpy"
 search_dir = Path(f"../DataFolder/Student_Response/{model_name}")
 siri_deep_feature_prefix = Path(f"../DataFolder/Siri_Related/{model_name}")
 word_tagging_prefix = Path("../DataFolder/Siri_Related/SiriR")
 student_asr_plist_prefix = Path("../DataFolder/Student_Response/Result")
 old_path_prefix = Path("../DataFolder/Student_Response/Match/result.csv.gz")
-df = get_information_for_all(search_dir,
+# %%
+df, list_of_match, list_of_unmatch\
+    = get_information_for_all(search_dir,
                              siri_deep_feature_prefix,
                              word_tagging_prefix,
                              student_asr_plist_prefix,
-                             old_path_prefix)
+                             old_path_prefix,
+                             threshold=0.30)
 df2 = df[df['old_matched_adj_count'] != 0]
 
 # score_diff is a column 'difference' in df2 DataFrame
@@ -322,51 +344,99 @@ analyze_score_diff(df2)
 df2.index.name = 'file'
 # save the result
 df2.to_csv(Path(f'../DataFolder/Student_Response/Save_CSV/Deep_Match_result_{model_name}.csv.gz'), compression='gzip')
+# %%
+all_match_score = np.concatenate(list_of_match)
+all_unmatch_score = np.concatenate(list_of_unmatch)
+# %%
+# Draw a histogram of the distribution of similarity score in matched word and unmatched word
+# do not draw line of the histogram it's too much
+fig, ax = plt.subplots(figsize=(7, 5))
+sns.histplot(data = all_match_score, label='Matched Word', binwidth=0.02, kde=True, stat='density', ax=ax)
+sns.histplot(data = all_unmatch_score, label='Unmatched Word', binwidth=0.02, kde=True,  stat='density', ax=ax)
+ax.legend()
+fig.suptitle('Normalized Histogram of Cosine Similarity', fontsize=14, fontweight='bold')
+fig.savefig('../compare_distrubution.pdf', format='pdf', dpi=300)
 #%%
-# # Test Cell
-# case_id = 'student_982_passage_34000_553fe870c3878'
-# siri_deep_feature_prefix = Path(f"../DataFolder/Siri_Related/{model_name}")
-# word_tagging_prefix = Path("../DataFolder/Siri_Related/SiriR")
-# single_result = search_dir / f'{case_id}.npy'
-# # Previous matching result
-# df_old = pd.read_csv(old_path_prefix, index_col=0)
-# old_string = df_old.loc[case_id]['result']
-# old_matched_string = ' '.join(map(lambda x: x.strip(), re.findall(r'([a-zA-Z\s]+)(?=<0\.\d{2}>)', old_string))).split(' ')
-# # read the file name
-# passage_id, student_deep_feature, file_name = read_student_deep_feature(single_result)
-# # read the siri file
-# list_of_word_tagging = read_siri_feature_and_label(passage_id, siri_deep_feature_prefix, word_tagging_prefix)
-# # calculate the matching
-# # generate all the matching
-# max_fitness = 0
-# for i in range(len(list_of_word_tagging)):
-#     matched_word_tagging, \
-#         matched_indices, \
-#         matched_similarity_score, \
-#         fitness_score, ori\
-#         = sequence_matching(student_deep_feature[0], list_of_word_tagging[i], 0.0)
-#     matched_string = ' '.join(list(map(lambda x: x['tString'], matched_word_tagging)))
-#     # print Siri id and matched string and fitness score (only keep 2 decimal)
-#     ref_string = ' '.join(list(map(lambda x: x['tString'], list_of_word_tagging[i])))
-#     print(f"Siri id: {i}, \n"
-#           f"Fitness Score {fitness_score:.2f}, "
-#           f"Matched Count: {len(matched_word_tagging)}, "
-#           f"Reference Count:{len(list_of_word_tagging[i])}, "
-#           f"Adjusted Matched Count: {len(matched_string.split(' '))}, "
-#           f"Adjusted Reference Count: {len(ref_string.split(' '))},\n "
-#           f"matched string: \n\t{matched_string}", end='\n\n')
-#     if fitness_score > max_fitness:
-#         # update the max fitness score
-#         max_fitness = fitness_score
-#         # save Adjusted Matched Count and Adjusted Reference Count's ID
-#         max_fitness_id = i
-#         max_adjusted_matched_count = len(matched_string.split(' '))
-# # Print Reference String
-# ref_string = ' '.join(list(map(lambda x: x['tString'], list_of_word_tagging[max_fitness_id])))
-# print(f"Student Response Count: {student_deep_feature[0].shape[0]},\t"
-#       f"Previous Matched Count: {len(old_matched_string)},\t"
-#       f"Current Matched Count: {max_adjusted_matched_count},\n"
-#       f"Reference String: \n\t{ref_string}")
+# Test Cell
+case_id = 'student_982_passage_34000_553fe870c3878'
+siri_deep_feature_prefix = Path(f"../DataFolder/Siri_Related/{model_name}")
+word_tagging_prefix = Path("../DataFolder/Siri_Related/SiriR")
+single_result = search_dir / f'{case_id}.npy'
+# Previous matching result
+df_old = pd.read_csv(old_path_prefix, index_col=0)
+old_string = df_old.loc[case_id]['result']
+old_matched_string = ' '.join(map(lambda x: x.strip(), re.findall(r'([a-zA-Z\s]+)(?=<0\.\d{2}>)', old_string))).split(' ')
+# read the file name
+passage_id, student_deep_feature, file_name = read_student_deep_feature(single_result)
+# read the siri file
+list_of_word_tagging = read_siri_feature_and_label(passage_id, siri_deep_feature_prefix, word_tagging_prefix)
+# calculate the matching
+# generate all the matching
+max_fitness = 0
+for i in range(len(list_of_word_tagging)):
+    matched_word_tagging, \
+        matched_indices, \
+        matched_similarity_score, \
+        fitness_score, ori\
+        = sequence_matching(student_deep_feature[0], list_of_word_tagging[i], 0.30)
+    matched_string = ' '.join(list(map(lambda x: x['tString'], matched_word_tagging)))
+    # print Siri id and matched string and fitness score (only keep 2 decimal)
+    ref_string = ' '.join(list(map(lambda x: x['tString'], list_of_word_tagging[i])))
+    print(f"Siri id: {i}, \n"
+          f"Fitness Score {fitness_score:.2f}, "
+          f"Matched Count: {len(matched_word_tagging)}, "
+          f"Reference Count:{len(list_of_word_tagging[i])}, "
+          f"Adjusted Matched Count: {len(matched_string.split(' '))}, "
+          f"Adjusted Reference Count: {len(ref_string.split(' '))},\n "
+          f"matched string: \n\t{matched_string}", end='\n\n')
+    if fitness_score > max_fitness:
+        # update the max fitness score
+        max_fitness = fitness_score
+        # save Adjusted Matched Count and Adjusted Reference Count's ID
+        max_fitness_id = i
+        max_adjusted_matched_count = len(matched_string.split(' '))
+# Print Reference String
+ref_string = ' '.join(list(map(lambda x: x['tString'], list_of_word_tagging[max_fitness_id])))
+print(f"Student Response Count: {student_deep_feature[0].shape[0]},\t"
+      f"Previous Matched Count: {len(old_matched_string)},\t"
+      f"Current Matched Count: {max_adjusted_matched_count},\n"
+      f"Reference String: \n\t{ref_string}")
+
+# %%
+# Draw a histogram of the distribution of similarity score in matched word and unmatched word
+# The cosine for all result is in variable ori the matched word is in variable matched_similarity_score
+# need to exclude match word in ori in get the unmatched word
+matched_score = np.array(matched_similarity_score).reshape(-1)
+unmatched_score = ori.reshape(-1)
+# remove all -1 in the unmatched_score
+unmatched_score = unmatched_score[unmatched_score != -1]
+# remove matched_score from unmatched_score
+unmatched_score = unmatched_score[~np.isin(unmatched_score, matched_score)]
+# plot use seaborn
+# the number of matched word and unmatched word are very different, so we need to normalize the histogram
+# use density=True to normalize the histogram
+sns.histplot(data = matched_score, label='Matched Word', binwidth=0.02, kde=True, stat='density')
+sns.histplot(data = unmatched_score, label='Unmatched Word', binwidth=0.02, kde=True,  stat='density')
+plt.legend()
+plt.show()
+
 
 
 # %%
+from scipy.signal import find_peaks
+bins_count = 75
+hist, bins = np.histogram(ori.reshape(-1), bins=bins_count)
+bin_centers = (bins[:-1] + bins[1:]) / 2
+peaks, _ = find_peaks(hist, distance=10)
+sorted_peaks = sorted(peaks, key=lambda x: -hist[x])
+top_two_peak_values = bin_centers[sorted_peaks[:2]]
+print("Top two peak values:", top_two_peak_values)
+
+sns.histplot(data=ori.reshape(-1), bins=bins_count, kde= True)
+plt.plot(bin_centers, hist, label="Histogram")
+# plt.plot(bin_centers[sorted_peaks[:2]], hist[sorted_peaks[:2]], "ro", label="Top 2 peaks")
+plt.axvline(top_two_peak_values[0], color='r', linestyle='--', label='Peak 1')
+plt.axvline(top_two_peak_values[1], color='r', linestyle='--', label='Peak 2')
+plt.legend()
+plt.show()
+#%%

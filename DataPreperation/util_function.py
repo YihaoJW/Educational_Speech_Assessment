@@ -300,7 +300,7 @@ class EmergencyExitCallback(tf.keras.callbacks.Callback):
         self.time_limit_str = os.environ.get(self.time_name, None)
         if self.time_limit_str is not None:
             self.time_limit = datetime.strptime(self.time_limit_str, "%Y-%m-%dT%H:%M:%S")
-            print(f"Time limit is set to {self.time_limit}")
+            print(f" Time limit is set to {self.time_limit}")
         else:
             self.time_limit = None
 
@@ -311,7 +311,7 @@ class EmergencyExitCallback(tf.keras.callbacks.Callback):
             if remaining_time < timedelta(minutes=self.remain_time):
                 raise EmergencyExit(f"Exiting because less than the specified remaining time: {self.remain_time}.")
             else:
-                print(f"Remaining time: {remaining_time}")
+                print(f" Remaining time: {remaining_time}")
 
 
 def load_config(file_path):
