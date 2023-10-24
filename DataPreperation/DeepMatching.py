@@ -8,6 +8,7 @@ import scipy.stats as stats
 from sklearn.utils import resample
 import seaborn as sns
 import matplotlib.pyplot as plt
+from scipy.signal import find_peaks
 
 
 def read_siri_feature_and_label(passage_id: int,
@@ -246,7 +247,7 @@ def get_information_for_all(search_dir: Path,
                             word_tagging_prefix: Path,
                             student_asr_plist_prefix: Path,
                             csv_result: Path,
-                            threshold :float = 0.8) -> pd.DataFrame:
+                            threshold: float = 0.8) -> pd.DataFrame:
     processed_case = []
     new_matched_adj_count = []
     old_matched_adj_count = []
@@ -299,7 +300,7 @@ def get_information_for_all(search_dir: Path,
         new_matched_adj_count.append(max_adjusted_matched_count)
         old_matched_adj_count.append(len(old_matched_string))
 
-        #get matched score
+        # get matched score
         matched_score = np.array(max_matched_similarity_score).reshape(-1)
         unmatched_score = max_result_ori.reshape(-1)
         # remove all -1 in the unmatched_score
@@ -329,13 +330,13 @@ word_tagging_prefix = Path("../DataFolder/Siri_Related/SiriR")
 student_asr_plist_prefix = Path("../DataFolder/Student_Response/Result")
 old_path_prefix = Path("../DataFolder/Student_Response/Match/result.csv.gz")
 # %%
-df, list_of_match, list_of_unmatch\
+df, list_of_match, list_of_unmatch \
     = get_information_for_all(search_dir,
-                             siri_deep_feature_prefix,
-                             word_tagging_prefix,
-                             student_asr_plist_prefix,
-                             old_path_prefix,
-                             threshold=0.30)
+                              siri_deep_feature_prefix,
+                              word_tagging_prefix,
+                              student_asr_plist_prefix,
+                              old_path_prefix,
+                              threshold=0.30)
 df2 = df[df['old_matched_adj_count'] != 0]
 
 # score_diff is a column 'difference' in df2 DataFrame
@@ -351,12 +352,12 @@ all_unmatch_score = np.concatenate(list_of_unmatch)
 # Draw a histogram of the distribution of similarity score in matched word and unmatched word
 # do not draw line of the histogram it's too much
 fig, ax = plt.subplots(figsize=(7, 5))
-sns.histplot(data = all_match_score, label='Matched Word', binwidth=0.02, kde=True, stat='density', ax=ax)
-sns.histplot(data = all_unmatch_score, label='Unmatched Word', binwidth=0.02, kde=True,  stat='density', ax=ax)
+sns.histplot(data=all_match_score, label='Matched Word', binwidth=0.02, kde=True, stat='density', ax=ax)
+sns.histplot(data=all_unmatch_score, label='Unmatched Word', binwidth=0.02, kde=True, stat='density', ax=ax)
 ax.legend()
 fig.suptitle('Normalized Histogram of Cosine Similarity', fontsize=14, fontweight='bold')
 fig.savefig('../compare_distrubution.pdf', format='pdf', dpi=300)
-#%%
+# %%
 # Test Cell
 case_id = 'student_982_passage_34000_553fe870c3878'
 siri_deep_feature_prefix = Path(f"../DataFolder/Siri_Related/{model_name}")
@@ -365,7 +366,8 @@ single_result = search_dir / f'{case_id}.npy'
 # Previous matching result
 df_old = pd.read_csv(old_path_prefix, index_col=0)
 old_string = df_old.loc[case_id]['result']
-old_matched_string = ' '.join(map(lambda x: x.strip(), re.findall(r'([a-zA-Z\s]+)(?=<0\.\d{2}>)', old_string))).split(' ')
+old_matched_string = ' '.join(map(lambda x: x.strip(), re.findall(r'([a-zA-Z\s]+)(?=<0\.\d{2}>)', old_string))).split(
+    ' ')
 # read the file name
 passage_id, student_deep_feature, file_name = read_student_deep_feature(single_result)
 # read the siri file
@@ -377,7 +379,7 @@ for i in range(len(list_of_word_tagging)):
     matched_word_tagging, \
         matched_indices, \
         matched_similarity_score, \
-        fitness_score, ori\
+        fitness_score, ori \
         = sequence_matching(student_deep_feature[0], list_of_word_tagging[i], 0.30)
     matched_string = ' '.join(list(map(lambda x: x['tString'], matched_word_tagging)))
     # print Siri id and matched string and fitness score (only keep 2 decimal)
@@ -415,15 +417,12 @@ unmatched_score = unmatched_score[~np.isin(unmatched_score, matched_score)]
 # plot use seaborn
 # the number of matched word and unmatched word are very different, so we need to normalize the histogram
 # use density=True to normalize the histogram
-sns.histplot(data = matched_score, label='Matched Word', binwidth=0.02, kde=True, stat='density')
-sns.histplot(data = unmatched_score, label='Unmatched Word', binwidth=0.02, kde=True,  stat='density')
+sns.histplot(data=matched_score, label='Matched Word', binwidth=0.02, kde=True, stat='density')
+sns.histplot(data=unmatched_score, label='Unmatched Word', binwidth=0.02, kde=True, stat='density')
 plt.legend()
 plt.show()
 
-
-
 # %%
-from scipy.signal import find_peaks
 bins_count = 75
 hist, bins = np.histogram(ori.reshape(-1), bins=bins_count)
 bin_centers = (bins[:-1] + bins[1:]) / 2
@@ -432,11 +431,11 @@ sorted_peaks = sorted(peaks, key=lambda x: -hist[x])
 top_two_peak_values = bin_centers[sorted_peaks[:2]]
 print("Top two peak values:", top_two_peak_values)
 
-sns.histplot(data=ori.reshape(-1), bins=bins_count, kde= True)
+sns.histplot(data=ori.reshape(-1), bins=bins_count, kde=True)
 plt.plot(bin_centers, hist, label="Histogram")
 # plt.plot(bin_centers[sorted_peaks[:2]], hist[sorted_peaks[:2]], "ro", label="Top 2 peaks")
 plt.axvline(top_two_peak_values[0], color='r', linestyle='--', label='Peak 1')
 plt.axvline(top_two_peak_values[1], color='r', linestyle='--', label='Peak 2')
 plt.legend()
 plt.show()
-#%%
+# %%

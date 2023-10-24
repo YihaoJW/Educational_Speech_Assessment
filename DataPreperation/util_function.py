@@ -3,8 +3,10 @@ from pathlib import Path
 import tensorflow as tf
 from tensorflow.python.keras import layers, activations
 from shutil import rmtree
-import sys, os, subprocess,yaml
+import sys, os, subprocess, yaml
 from datetime import datetime, timedelta
+
+
 def generate_sprite_image(image_list, image_size):
     # Create a TensorFlow dataset from the image list
     dataset = tf.data.Dataset.from_tensor_slices(image_list)
@@ -55,7 +57,7 @@ def init_tensorboard(log_dir, name=None):
     return process
 
 
-# helper function resolve path related issue it receive a dict return void
+# helper function resolve path related issue it receives a dict return void
 def path_resolve(config_dict, args):
     """
     Sample of configuration file
@@ -202,7 +204,7 @@ class PositionEncoding1D(layers.Layer):
             encode = self.get_encode(length, x, tig=tig - 1)
         return encode
 
-    def call(self, x, training=False):
+    def call(self, x, training=False, mask=None):
         x_length = tf.shape(x)[-2]
         return self.get_encode(x_length, x)
 

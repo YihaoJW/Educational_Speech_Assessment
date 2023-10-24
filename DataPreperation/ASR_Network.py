@@ -6,19 +6,15 @@ from tensorflow import Tensor
 from tqdm.notebook import tqdm
 from typing import Callable, List, Tuple, Union, Optional, Dict, Any, Sequence, Iterable, TypeVar
 from DataPipe import DataPipeFactory
-from util_function import inform_pooling, GatedXVector, PositionEncoding1D
+from util_function import inform_pooling
+from AttentionModule import CutConcatenate, CrossAttention, SelfAttention, RotaryEmbeddingMask
 
 
-# A function that generate a residual Block using separable convolution
-def residual_block(x, channels, filter_size, dropout_rate=-1.0):
+# A function that generates a residual Block using separable convolution
+def residual_block(x, channels, filter_size, dropout_rate=-1.0, attention_heads=2):
     x_input = x
-    # Residual block start Normalize, Activate, and Convolution
-    x = tf.keras.layers.BatchNormalization()(x)
-    x = tf.keras.layers.Activation('relu')(x)
-    x = tf.keras.layers.SeparableConv1D(channels, filter_size, padding='same')(x)
-    if dropout_rate > 0:
-        x = tf.keras.layers.Dropout(dropout_rate)(x)
-
+    # Self-attention
+    x = SelfAttention(num_heads=attention_heads, key_dim=channels, dropout=dropout_rate)(x)
     x = tf.keras.layers.BatchNormalization()(x)
     x = tf.keras.layers.Activation('relu')(x)
     x = tf.keras.layers.SeparableConv1D(channels, filter_size, padding='same')(x)
@@ -29,33 +25,20 @@ def residual_block(x, channels, filter_size, dropout_rate=-1.0):
 
 
 # Build a Convolutional with to adjust the input to the residual block and apply several residual block
-def residual_block_stack(x, channels, filter_size, stack_size, dropout_rate=-1.0):
+def residual_block_stack(x, channels, filter_size, stack_size, dropout_rate=-1.0, attention_heads=2):
     x = tf.keras.layers.Conv1D(channels, filter_size, padding='same')(x)
     for i in range(stack_size):
-        x = residual_block(x, channels, filter_size, dropout_rate)
+        x = residual_block(x, channels, filter_size, dropout_rate, attention_heads)
     return x
 
 
-# Define a Concatenate layer that will cut the input to the same length
-class CutConcatenate(tf.keras.layers.Concatenate):
-    def call(self, inputs):
-        inter = [tf.slice(x, [0, 0, 0], [-1, tf.shape(inputs[0])[1], -1]) for x in inputs]
-        # Set shape of inter to the shape of inputs if input is Tensor Placeholder
-        shapes = [x.shape for x in inputs]
-        for y, x in zip(inter, inputs):
-            d = [sx if sx is not None and sy is None else sy for sx, sy in zip(x.shape, y.shape)]
-            y.set_shape(d)
-
-        return super().call(inter)
-
-
-# Function build a U-Net
-def build_unet(x, output_shape, channels_list, filter_size, stack_size, dropout_rate=-1.0):
+# Function builds a U-Net
+def build_unet(x, output_shape, channels_list, filter_size, stack_size, dropout_rate=-1.0, attention_heads=2):
     # Build the encoder
     encoder = []
     decoder = []
     for i in range(len(channels_list)):
-        x = residual_block_stack(x, channels_list[i], filter_size, stack_size, dropout_rate)
+        x = residual_block_stack(x, channels_list[i], filter_size, stack_size, dropout_rate, attention_heads)
         encoder.append(x)
         if i < len(channels_list) - 1:
             x = tf.keras.layers.AvgPool1D(2)(x)
@@ -63,7 +46,9 @@ def build_unet(x, output_shape, channels_list, filter_size, stack_size, dropout_
     for i in range(len(channels_list) - 2, -1, -1):
         # Stride 2 convolution to upsample
         x = tf.keras.layers.Conv1DTranspose(channels_list[i], 4, strides=2, padding='valid')(x)
-        x = CutConcatenate(axis=-1)([encoder[i], x])
+        # x = CutConcatenate(axis=-1)([encoder[i], x])
+        x_c = CrossAttention(num_heads=attention_heads, key_dim=channels_list[i], dropout=dropout_rate)([x, encoder[i]])
+        x = tf.keras.layers.Concatenate(axis=-1)([x, x_c])
         x = residual_block_stack(x, channels_list[i], filter_size, stack_size, dropout_rate)
         decoder.append(x)
     # Build the output
@@ -78,10 +63,10 @@ def build_network(input_shape, output_shape, channels_list, filter_size, stack_s
     return tf.keras.Model(x, y)
 
 
-# Define a residual block that use fully connected layer
+# Define a residual block that uses a fully connected layer
 def residual_block_fc(x, channels, dropout_rate=-1.):
     x_input = x
-    # Residual block start Normalize, Activate, and Convolution
+    # Residual block start Normalizes, Activates, and Convolution
     if dropout_rate > 0.0:
         x = tf.keras.layers.Dropout(dropout_rate)(x)
     x = tf.keras.layers.BatchNormalization()(x)
@@ -208,10 +193,13 @@ class ASR_Network(tf.keras.Model):
                  margin,
                  k_top=5,
                  dropout_rate=0.2,
+                 attention_heads=2,
                  **kwargs):
 
         super().__init__(**kwargs)
-        self.base_network = self.create_base_network(dropout_rate=dropout_rate, **base_feature)
+        self.base_network = self.create_base_network(attention_heads=attention_heads,
+                                                     dropout_rate=dropout_rate,
+                                                     **base_feature)
         self.deep_feature = self.build_dense_network(dropout_rate=dropout_rate, **dense_feature)
         self.word_prediction = self.build_dense_network(dropout_rate=dropout_rate, **word_prediction)
         pooling_ratios = [base_ratio / 2 ** i for i in range(len(base_feature['channels_list']))]
@@ -231,9 +219,19 @@ class ASR_Network(tf.keras.Model):
         self.auto_balancing_layer = AutoLossBalancing(name='auto_loss_balancing')
 
     @staticmethod
-    def create_base_network(input_shape, feature_depth, channels_list, filter_size, stack_size, dropout_rate=-1.0):
+    def create_base_network(input_shape,
+                            feature_depth,
+                            channels_list,
+                            filter_size,
+                            stack_size,
+                            dropout_rate=-1.0,
+                            attention_heads=2):
         x = tf.keras.Input(input_shape)
-        y, maps = build_unet(x, feature_depth, channels_list, filter_size, stack_size, dropout_rate=dropout_rate)
+        x = tf.keras.layers.Masking(mask_value=-1.0)(x)
+        x = RotaryEmbeddingMask()(x)
+        y, maps = build_unet(x, feature_depth, channels_list, filter_size, stack_size,
+                             dropout_rate=dropout_rate,
+                             attention_heads=attention_heads)
         return tf.keras.Model(x, [y, maps])
 
     @staticmethod
@@ -310,7 +308,7 @@ class ASR_Network(tf.keras.Model):
         total_loss = tf.reduce_sum(loss_array.stack())
         return total_loss
 
-    #    @tf.function
+    @tf.function
     def call(self, inputs, training=False, mask=None):
         audio, (start, duration) = inputs
         # compute the base network
@@ -328,11 +326,11 @@ class ASR_Network(tf.keras.Model):
         return word_prediction, deep_feature
 
     # compute a input pair
-    def compute_pair(self, inputs, training=False, mask=None):
+    def compute_pair(self, inputs, training=False):
         student, reference = inputs
         # compute both student and reference
-        student_output, student_deep_feature = self(student, training=training, mask=mask)
-        reference_output, reference_deep_feature = self(reference, training=training, mask=mask)
+        student_output, student_deep_feature = self(student, training=training)
+        reference_output, reference_deep_feature = self(reference, training=training)
         return (student_output, student_deep_feature), (reference_output, reference_deep_feature)
 
     # get loss for an input pair
@@ -349,7 +347,7 @@ class ASR_Network(tf.keras.Model):
         return avg_word_loss, deep_loss
 
     def train_step(self, data):
-        # unpack the data, input has two pair of audio and y has one word reference
+        # unpack the data, input has two pairs of audios, and y has one word reference
         x, word_reference = data
         # compute the loss for each pair
         with tf.GradientTape() as tape:
