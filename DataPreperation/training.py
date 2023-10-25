@@ -67,7 +67,10 @@ if __name__ == '__main__':
         with open(config['model_storage']['model_restore'].parent / 'wandb_id.txt', 'w') as f:
             f.write(run_id)
 
-    wandb.init(project="ASR_Model_AttentionBased", config=config['model_setting'], resume="allow", id=run_id)
+    wandb.init(project="ASR_Model_AttentionBased",
+               config=config['model_setting'],
+               resume="allow", id=run_id,
+               dir=config['model_storage']['tensorboard_path'].parent)
     print("manual debug: Wandb created")
     # create learning rate scheduler
     lr_config = config['training_setting']['learning_rate']
