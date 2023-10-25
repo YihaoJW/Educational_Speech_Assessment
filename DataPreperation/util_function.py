@@ -80,6 +80,8 @@ def path_resolve(config_dict, args):
                             'siri_meta': 'Siri_Related/Siri_Dense_Index'},
           'cache_location': {'cache': 'cache/'}
           }
+    This function will generate all folders if they don't exist. If retrain is True, it will delete the old model.
+    After this function is called, the dir is guaranteed to exist, and the folder is ready for resume or retrain.
     """
     for key in config_dict['data_location']:
         config_dict['data_location'][key] = Path(config_dict['data_location'][key])

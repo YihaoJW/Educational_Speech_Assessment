@@ -4,8 +4,9 @@ from ASR_Network import ASR_Network
 from DataPipe import DataPipeFactory
 import argparse
 import sys
-import time
-from util_function import init_tensorboard, path_resolve, EmergencyExit, EmergencyExitCallback, load_config
+from util_function import path_resolve, EmergencyExit, EmergencyExitCallback, load_config
+import wandb
+from wandb.keras import WandbMetricsLogger
 
 
 def unpack(d):
@@ -29,7 +30,6 @@ def data_train_eval(tf_record_path, siri_voice, siri_meta, cache):
     eval_path = tf_record_path.parent / 'Student_Answer_Record_Eval.tfrecord'
     assert eval_path.exists()
     train = DataPipeFactory(train_path, siri_voice, siri_meta, cache / 'train')
-
     eval = DataPipeFactory(eval_path, siri_voice, siri_meta, cache / 'eval')
     return train, eval
 
@@ -50,12 +50,25 @@ if __name__ == '__main__':
     #     config = safe_load(f)
     config = load_config(args.config)
 
+    # This function will generate all folders if they don't exist. If retrain is True, it will delete the old model.
+    # After this function is called, the dir is guaranteed to exist, and the folder is ready for resume or retrain.
     path_resolve(config, args)
     print("manual debug: config loaded")
     # set the batch size
     config['model_setting']['batch_num'] = config['training_setting']['batch_size']
 
-    print("manual debug: network created")
+    # Create Wandb run and save the run id to model_restore
+    # read run id from file(if exists) else generate a new one and save it to file
+    if (config['model_storage']['model_restore'] / 'wandb_id.txt').exists():
+        with open(config['model_storage']['model_restore'] / 'wandb_id.txt', 'r') as f:
+            run_id = f.read()
+    else:
+        run_id = wandb.util.generate_id()
+        with open(config['model_storage']['model_restore'] / 'wandb_id.txt', 'w') as f:
+            f.write(run_id)
+
+    wandb.init(project=args.name, config=config['model_setting'], resume="allow", id=run_id)
+    print("manual debug: Wandb created")
     # create learning rate scheduler
     lr_config = config['training_setting']['learning_rate']
     callback_config = config['model_storage']
@@ -72,6 +85,7 @@ if __name__ == '__main__':
                                                              monitor='val_loss')
     backup_callback = tf.keras.callbacks.BackupAndRestore(backup_dir=callback_config['model_restore'],
                                                           delete_checkpoint=False)
+
     # train the model
     train_config = config['training_setting']
     # set datapipe to final state
@@ -131,28 +145,6 @@ if __name__ == '__main__':
     network.evaluate(dst_test)
     print("manual debug: data pipe set, about to train")
 
-    # Launching tensorboard
-    tb_process = None
-    try:
-        tb_process = init_tensorboard(log_dir=config['model_storage']['tensorboard_path'], name=args.name)
-        print(f"manual debug: tensorboard upload at {config['model_storage']['tensorboard_path']}")
-    except Exception as e:
-        print(e, file=sys.stderr)
-        print("manual debug: tensorboard upload failed")
-    # Check if tensorboard is up
-    if tb_process.poll() is None:
-        print("manual debug: tensorboard is up")
-    else:
-        print("manual debug: tensorboard is down")
-        # print the error message
-        tb_process.terminate()
-        time.sleep(5)
-        tb_process.kill()
-        # get communication from the process print error to stderr and output to stdout
-        tb_out, tb_err = tb_process.communicate()
-        print(tb_out, file=sys.stdout)
-        print(tb_err, file=sys.stderr)
-
     print("manual debug: start training")
     attempt = 0
     while True:
@@ -161,7 +153,11 @@ if __name__ == '__main__':
             network.fit(dst_train,
                         epochs=train_config['epoch'],
                         validation_data=dst_test,
-                        callbacks=[tensorboard_callback, checkpoint_callback, backup_callback, EmergencyExitCallback(45)])
+                        callbacks=[tensorboard_callback,
+                                   checkpoint_callback,
+                                   backup_callback,
+                                   EmergencyExitCallback(45),
+                                   WandbMetricsLogger(log_freq=1)])
             print("manual debug: Training completed successfully.")
             break
         except EmergencyExit as e:
@@ -172,10 +168,3 @@ if __name__ == '__main__':
             print(f"Error occurred during training: {e}", file=sys.stderr)
             print(f"manual debug: the {attempt} failed Retrying training...")
 
-    # End Tensorboard if tb_process is not None
-    if tb_process is not None:
-        tb_process.terminate()
-        # kill if the process is still alive after 15 seconds
-        time.sleep(15)
-        if tb_process.poll() is None:
-            tb_process.kill()
