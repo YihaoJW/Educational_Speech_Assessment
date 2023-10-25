@@ -29,9 +29,9 @@ def data_train_eval(tf_record_path, siri_voice, siri_meta, cache):
     assert train_path.exists()
     eval_path = tf_record_path.parent / 'Student_Answer_Record_Eval.tfrecord'
     assert eval_path.exists()
-    train = DataPipeFactory(train_path, siri_voice, siri_meta, cache / 'train')
-    eval = DataPipeFactory(eval_path, siri_voice, siri_meta, cache / 'eval')
-    return train, eval
+    train_set = DataPipeFactory(train_path, siri_voice, siri_meta, cache / 'train')
+    eval_set = DataPipeFactory(eval_path, siri_voice, siri_meta, cache / 'eval')
+    return train_set, eval_set
 
 
 if __name__ == '__main__':
@@ -59,12 +59,12 @@ if __name__ == '__main__':
 
     # Create Wandb run and save the run id to tensorboard
     # read run id from file(if exists) else generate a new one and save it to file
-    if (config['model_storage']['tensorboard_path'] / 'wandb_id.txt').exists():
-        with open(config['model_storage']['tensorboard_path'] / 'wandb_id.txt', 'r') as f:
+    if (config['model_storage']['model_restore'].parent / 'wandb_id.txt').exists():
+        with open(config['model_storage']['model_restore'].parent / 'wandb_id.txt', 'r') as f:
             run_id = f.read()
     else:
         run_id = wandb.util.generate_id()
-        with open(config['model_storage']['tensorboard_path'] / 'wandb_id.txt', 'w') as f:
+        with open(config['model_storage']['model_restore'].parent / 'wandb_id.txt', 'w') as f:
             f.write(run_id)
 
     wandb.init(project="ASR_Model_AttentionBased", config=config['model_setting'], resume="allow", id=run_id)
