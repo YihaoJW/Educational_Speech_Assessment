@@ -57,14 +57,14 @@ if __name__ == '__main__':
     # set the batch size
     config['model_setting']['batch_num'] = config['training_setting']['batch_size']
 
-    # Create Wandb run and save the run id to model_restore
+    # Create Wandb run and save the run id to tensorboard
     # read run id from file(if exists) else generate a new one and save it to file
-    if (config['model_storage']['model_restore'] / 'wandb_id.txt').exists():
-        with open(config['model_storage']['model_restore'] / 'wandb_id.txt', 'r') as f:
+    if (config['model_storage']['tensorboard_path'] / 'wandb_id.txt').exists():
+        with open(config['model_storage']['tensorboard_path'] / 'wandb_id.txt', 'r') as f:
             run_id = f.read()
     else:
         run_id = wandb.util.generate_id()
-        with open(config['model_storage']['model_restore'] / 'wandb_id.txt', 'w') as f:
+        with open(config['model_storage']['tensorboard_path'] / 'wandb_id.txt', 'w') as f:
             f.write(run_id)
 
     wandb.init(project=args.name, config=config['model_setting'], resume="allow", id=run_id)
