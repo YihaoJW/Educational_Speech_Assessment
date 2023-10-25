@@ -308,7 +308,7 @@ class EmergencyExitCallback(tf.keras.callbacks.Callback):
         else:
             self.time_limit = None
 
-    def on_train_batch_begin(self, batch, logs=None):
+    def on_epoch_begin(self, batch, logs=None):
         if self.time_limit is not None:
             current_time = datetime.now()
             remaining_time = self.time_limit - current_time
