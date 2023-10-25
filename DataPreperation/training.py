@@ -42,6 +42,8 @@ if __name__ == '__main__':
     parser.add_argument('--retrain', default=False, action='store_true')
     # if you use distributed training default is False action is store_true
     parser.add_argument('--distributed', action='store_true', default=False)
+    # add GPU Growth Default is False action is store_true
+    parser.add_argument('--gpu_growth', action='store_true', default=False)
     # add name of for current run default is None
     parser.add_argument('--name', type=str, default=None)
     args = parser.parse_args()
@@ -50,9 +52,10 @@ if __name__ == '__main__':
     #     config = safe_load(f)
     config = load_config(args.config)
 
-    gpus = tf.config.experimental.list_physical_devices('GPU')
-    for gpu in gpus:
-        tf.config.experimental.set_memory_growth(gpu, True)
+    if args.gpu_growth:
+        gpus = tf.config.experimental.list_physical_devices('GPU')
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
 
     # This function will generate all folders if they don't exist. If retrain is True, it will delete the old model.
     # After this function is called, the dir is guaranteed to exist, and the folder is ready for resume or retrain.
