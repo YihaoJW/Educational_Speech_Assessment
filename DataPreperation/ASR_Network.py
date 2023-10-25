@@ -15,7 +15,7 @@ def residual_block(x, channels, filter_size, dropout_rate=-1.0, attention_heads=
     x_input = x
     # Self-attention
     x = SelfAttention(num_heads=attention_heads, key_dim=channels, dropout=dropout_rate)(x)
-    x = tf.keras.layers.BatchNormalization()(x)
+    x = tf.keras.layers.GroupNormalization(groups=16)(x)
     x = tf.keras.layers.Activation('relu')(x)
     x = tf.keras.layers.SeparableConv1D(channels, filter_size, padding='same')(x)
     if dropout_rate > 0:
@@ -69,12 +69,12 @@ def residual_block_fc(x, channels, dropout_rate=-1.):
     # Residual block start Normalizes, Activates, and Convolution
     if dropout_rate > 0.0:
         x = tf.keras.layers.Dropout(dropout_rate)(x)
-    x = tf.keras.layers.BatchNormalization()(x)
+    x = tf.keras.layers.GroupNormalization(groups=16)(x)
     x = tf.keras.layers.Activation('relu')(x)
     x = tf.keras.layers.Dense(channels)(x)
     if dropout_rate > 0.0:
         x = tf.keras.layers.Dropout(dropout_rate)(x)
-    x = tf.keras.layers.BatchNormalization()(x)
+    x = tf.keras.layers.GroupNormalization(groups=16)(x)
     x = tf.keras.layers.Activation('relu')(x)
     x = tf.keras.layers.Dense(channels)(x)
 
