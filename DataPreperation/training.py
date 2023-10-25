@@ -50,9 +50,9 @@ if __name__ == '__main__':
     #     config = safe_load(f)
     config = load_config(args.config)
 
-    gpus = tf.config.experimental.list_physical_devices('GPU')
-    for gpu in gpus:
-        tf.config.experimental.set_memory_growth(gpu, True)
+    # gpus = tf.config.experimental.list_physical_devices('GPU')
+    # for gpu in gpus:
+    #     tf.config.experimental.set_memory_growth(gpu, True)
 
     # This function will generate all folders if they don't exist. If retrain is True, it will delete the old model.
     # After this function is called, the dir is guaranteed to exist, and the folder is ready for resume or retrain.
@@ -164,7 +164,7 @@ if __name__ == '__main__':
                                    checkpoint_callback,
                                    backup_callback,
                                    EmergencyExitCallback(45),
-                                   WandbMetricsLogger(log_freq=1)])
+                                   WandbMetricsLogger(log_freq=32)])
             print("manual debug: Training completed successfully.")
             break
         except EmergencyExit as e:
