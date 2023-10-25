@@ -14,7 +14,10 @@ from AttentionModule import CutConcatenate, CrossAttention, SelfAttention, Rotar
 def residual_block(x, channels, filter_size, dropout_rate=-1.0, attention_heads=2):
     x_input = x
     # Self-attention
-    x = SelfAttention(num_heads=attention_heads, key_dim=channels, dropout=dropout_rate)(x)
+    if channels > 128:
+        x = SelfAttention(num_heads=attention_heads, key_dim=channels, dropout=dropout_rate)(x)
+    else:
+        x = tf.keras.layers.SeparableConv1D(channels, filter_size, padding='same')(x)
     x = tf.keras.layers.GroupNormalization(groups=16)(x)
     x = tf.keras.layers.Activation('relu')(x)
     x = tf.keras.layers.SeparableConv1D(channels, filter_size, padding='same')(x)
@@ -47,8 +50,11 @@ def build_unet(x, output_shape, channels_list, filter_size, stack_size, dropout_
         # Stride 2 convolution to upsample
         x = tf.keras.layers.Conv1DTranspose(channels_list[i], 4, strides=2, padding='valid')(x)
         # x = CutConcatenate(axis=-1)([encoder[i], x])
-        x_c = CrossAttention(num_heads=attention_heads, key_dim=channels_list[i], dropout=dropout_rate)([x, encoder[i]])
-        x = tf.keras.layers.Concatenate(axis=-1)([x, x_c])
+        if channels_list[i] > 128:
+            x_c = CrossAttention(num_heads=attention_heads, key_dim=channels_list[i], dropout=dropout_rate)([x, encoder[i]])
+            x = tf.keras.layers.Concatenate(axis=-1)([x, x_c])
+        else:
+            x = CutConcatenate(axis=-1)([encoder[i], x])
         x = residual_block_stack(x, channels_list[i], filter_size, stack_size, dropout_rate)
         decoder.append(x)
     # Build the output
