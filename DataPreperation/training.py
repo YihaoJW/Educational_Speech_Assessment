@@ -6,6 +6,7 @@ import sys
 from util_function import path_resolve, EmergencyExit, EmergencyExitCallback, load_config
 import wandb
 from wandb.keras import WandbMetricsLogger
+from pathlib import Path
 
 
 def unpack(d):
@@ -77,7 +78,9 @@ if __name__ == '__main__':
         with open(config['model_storage']['model_restore'].parent / 'wandb_id.txt', 'w') as f:
             f.write(run_id)
 
-    wandb.tensorboard.patch(root_logdir=config['model_storage']['tensorboard_path'])
+    tfb_path = Path(config['model_storage']['tensorboard_path'])
+    tfb_path.mkdir(parents=True, exist_ok=True)
+    wandb.tensorboard.patch(root_logdir=tfb_path.absolute())
     wandb.init(project="ASR_Model_AttentionBased",
                config=config['model_setting'],
                resume="allow", id=run_id,
@@ -120,7 +123,8 @@ if __name__ == '__main__':
         print("manual debug: data pipe save/load end")
 
         with strategy.scope():
-            dst_train = train_data.get_batch_data(batch_size=train_config['batch_size'], interleave=True, addition_map=unpack)
+            dst_train = train_data.get_batch_data(batch_size=train_config['batch_size'], interleave=True,
+                                                  addition_map=unpack)
             dst_test = eval_data.get_batch_data(batch_size=train_config['batch_size'], addition_map=unpack)
             learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(lr_config['initial'],
                                                                            lr_config['decay_step'],
@@ -128,7 +132,8 @@ if __name__ == '__main__':
                                                                            staircase=True)
             network = ASR_Network(**config['model_setting'])
             # create the optimizer
-            optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate, amsgrad=True, clipnorm=1.0, clipvalue=0.05)
+            optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate, amsgrad=True, clipnorm=1.0,
+                                                 clipvalue=0.05)
             network.compile(optimizer=optimizer)
     else:
         # covert all path to string and create the data pipe sample if DataPipeFactory is a class
@@ -144,7 +149,8 @@ if __name__ == '__main__':
         eval_data.try_save()
         print("manual debug: data pipe save/load end")
 
-        dst_train = train_data.get_batch_data(batch_size=train_config['batch_size'], interleave=True, addition_map=unpack)
+        dst_train = train_data.get_batch_data(batch_size=train_config['batch_size'], interleave=True,
+                                              addition_map=unpack)
         dst_test = eval_data.get_batch_data(batch_size=train_config['batch_size'], addition_map=unpack)
         learning_rate = tf.keras.optimizers.schedules.ExponentialDecay(lr_config['initial'],
                                                                        lr_config['decay_step'],
@@ -184,4 +190,3 @@ if __name__ == '__main__':
         except Exception as e:
             print(f"Error occurred during training: {e}", file=sys.stderr)
             print(f"manual debug: the {attempt} failed Retrying training...")
-
