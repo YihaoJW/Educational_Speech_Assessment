@@ -79,6 +79,8 @@ class SelfAttention(BaseAttention):
         attention_mask = self.generate_attention_mask(mask, mask)
         x = self.calculate_attention(x, x, attention_mask)
         x = self.layer_norm(x)
+        # mask of X is the same as the input mask
+        x._keras_mask = mask
         return x
 
 
@@ -93,9 +95,11 @@ class CrossAttention(BaseAttention):
         mask_x, mask_y = mask if mask is not None else (None, None)
         attention_mask = self.generate_attention_mask(mask_x, mask_y)
 
-        x = self.calculate_attention(x, y, attention_mask)
-        x = self.layer_norm(x)
-        return x
+        y = self.calculate_attention(x, y, attention_mask)
+        y = self.layer_norm(x)
+        # mask of Y is the same as the input mask
+        y._keras_mask = mask_y
+        return y
 
 
 class PositionEncoding1D(tf.keras.layers.Layer):
