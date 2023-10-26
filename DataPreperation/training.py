@@ -7,6 +7,7 @@ from util_function import path_resolve, EmergencyExit, EmergencyExitCallback, lo
 import wandb
 from wandb.keras import WandbMetricsLogger
 from pathlib import Path
+import tensorflow_models as tfm
 
 
 def unpack(d):
@@ -130,9 +131,14 @@ if __name__ == '__main__':
                                                                            lr_config['decay_step'],
                                                                            lr_config['decay'],
                                                                            staircase=True)
+
+            final_lr = tfm.optimization.LinearWarmup(after_warmup_lr_sched=learning_rate,
+                                                     warmup_steps=10000,
+                                                     warmup_learning_rate=0.0)
+
             network = ASR_Network(**config['model_setting'])
             # create the optimizer
-            optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate, amsgrad=True, clipnorm=1.0,
+            optimizer = tf.keras.optimizers.Adam(learning_rate=final_lr, amsgrad=True, clipnorm=1.0,
                                                  clipvalue=0.05)
             network.compile(optimizer=optimizer)
     else:
@@ -156,9 +162,14 @@ if __name__ == '__main__':
                                                                        lr_config['decay_step'],
                                                                        lr_config['decay'],
                                                                        staircase=True)
+
+        final_lr = tfm.optimization.LinearWarmup(after_warmup_lr_sched=learning_rate,
+                                                 warmup_steps=10000,
+                                                 warmup_learning_rate=0.0)
+
         network = ASR_Network(**config['model_setting'])
         # create the optimizer
-        optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate, amsgrad=True, clipnorm=1.0, clipvalue=0.05)
+        optimizer = tf.keras.optimizers.Adam(learning_rate=final_lr, amsgrad=True, clipnorm=1.0, clipvalue=0.05)
         network.compile(optimizer=optimizer)
     print("manual debug: network compiled")
     if args.test_eval:

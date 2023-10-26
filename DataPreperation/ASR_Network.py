@@ -173,7 +173,7 @@ class AutoLossBalancing(tf.keras.layers.Layer):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.auto_balancing = self.add_weight('auto_balancing', shape=(2,), dtype=tf.float32, trainable=True,
-                                              initializer='zeros', constraint=MinMaxClip(-5, 5))
+                                              initializer='zeros', constraint=MinMaxClip(-2, 2))
 
     def call(self, inputs, training=None, mask=None):
         word_loss, deep_loss = inputs[0], inputs[1]
