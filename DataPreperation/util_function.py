@@ -343,3 +343,27 @@ def load_config(file_path):
     config = yaml.safe_load(config_str)
 
     return config
+
+
+class AndMasking(tf.keras.layers.Masking):
+    """
+    Allow bypassing previous mask and add a new mask design for multi value input
+    """
+
+    def compute_mask(self, inputs, mask=None):
+        new_mask = super().compute_mask(inputs, mask)
+        if mask is not None:
+            # this mask is input mask that comes from the previous layer if not None Combine with new mask
+            return tf.math.logical_and(new_mask, mask)
+        else:
+            # if mask is None use new mask
+            return new_mask
+
+    def call(self, inputs, mask=None):
+        new_output = super().call(inputs)
+        # Combine two mask
+        if mask is None:
+            return new_output
+        else:
+            new_output._keras_mask = tf.math.logical_and(new_output._keras_mask, mask)
+            return new_output

@@ -51,13 +51,13 @@ class BaseAttention(tf.keras.layers.Layer):
         Returns:
             A Tensor representing the cross attention mask, or None if both mask_x and mask_y are None.
         """
+
+        # If mask_y (key mask) is None, return all True attention mask
         if mask_y is None:
-            return tf.ones([1.0, 1.0, 1.0])
+            return tf.ones([1, 1, 1])
 
-        if mask_x is None:
-            mask_x = tf.ones_like(mask_y)
-
-        return tf.logical_and(tf.expand_dims(mask_x, 1), tf.expand_dims(mask_y, 2))
+        # Only expand dimensions of mask_y for keys, as we only want to mask the keys
+        return tf.expand_dims(mask_y, 1)
 
     def compute_mask(self, inputs, mask=None):
         # Just pass the received mask from the previous layer to the next layer or

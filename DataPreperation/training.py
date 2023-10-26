@@ -15,6 +15,8 @@ def unpack(d):
 
     # unpack with another key ref_mfcc, valid_ref_start, valid_ref_duration
     value_f = d['ref_mfcc']
+    # The previous padding value is shift to -13.815510749816895, reset to -1
+    value_f = tf.where(tf.equal(value_f, -13.815510749816895), -1., value_f)
     start_f = tf.RaggedTensor.from_tensor(d['valid_ref_start'], padding=-1.)
     duration_f = tf.RaggedTensor.from_tensor(d['valid_ref_duration'], padding=-1.)
 
