@@ -173,7 +173,8 @@ if __name__ == '__main__':
                                    checkpoint_callback,
                                    backup_callback,
                                    EmergencyExitCallback(45),
-                                   WandbMetricsLogger(log_freq=1)])
+                                   WandbMetricsLogger(log_freq=1),
+                                   WandbMetricsLogger()])
             print("manual debug: Training completed successfully.")
             wandb.finish()
             break
