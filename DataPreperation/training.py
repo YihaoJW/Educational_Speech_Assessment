@@ -169,8 +169,9 @@ if __name__ == '__main__':
                                    checkpoint_callback,
                                    backup_callback,
                                    EmergencyExitCallback(45),
-                                   WandbMetricsLogger(log_freq=32)])
+                                   WandbMetricsLogger(log_freq=1)])
             print("manual debug: Training completed successfully.")
+            wandb.finish()
             break
         except EmergencyExit as e:
             print(f"EmergencyExit occurred during training: {e}", file=sys.stderr)
