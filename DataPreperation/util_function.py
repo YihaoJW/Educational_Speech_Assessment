@@ -298,22 +298,35 @@ class EmergencyExit(Exception):
 # End time can be read using environment variable default from SLURM, it only checks on training batch start
 class EmergencyExitCallback(tf.keras.callbacks.Callback):
     def __init__(self, remain_time=45, time_name="JOB_END_TIME", *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__()
         self.remain_time = remain_time
         self.time_name = time_name
         self.time_limit_str = os.environ.get(self.time_name, None)
+        self.log_time_start = datetime.now()
+        self.epoch_time = self.remain_time
         if self.time_limit_str is not None:
             self.time_limit = datetime.strptime(self.time_limit_str, "%Y-%m-%dT%H:%M:%S")
-            print(f" Time limit is set to {self.time_limit}")
+            print(f" Default Time limit is set to {self.time_limit}")
         else:
             self.time_limit = None
 
-    def on_epoch_begin(self, batch, logs=None):
+    def on_epoch_begin(self, epoch, logs=None):
+        # log the time
+        if self.time_limit is not None:
+            self.log_time_start = datetime.now()
+
+    def on_epoch_end(self, epoch, logs=None):
+        # Estimate the epoch time
+        epoch_wall_time = datetime.now() - self.log_time_start
+        # Update epoch time using Exponential Moving Average with factor 0.1, epoch time is in minutes
+        self.epoch_time = int(self.remain_time * 0.9 + (epoch_wall_time.total_seconds() / 60) * 0.1)
+        # add a margin of 10 minutes and set it as the remaining time
+        self.remain_time = self.epoch_time + 10
         if self.time_limit is not None:
             current_time = datetime.now()
             remaining_time = self.time_limit - current_time
             if remaining_time < timedelta(minutes=self.remain_time):
-                raise EmergencyExit(f"Exiting because less than the specified remaining time: {self.remain_time}.")
+                raise EmergencyExit(f"Exiting because there lack of time to finish the epoch: {self.remain_time}.")
             else:
                 print(f" Remaining time: {remaining_time}")
 
