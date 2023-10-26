@@ -94,7 +94,6 @@ if __name__ == '__main__':
     tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=callback_config['tensorboard_path'] / 'tensorboard',
                                                           histogram_freq=5,
                                                           write_graph=False,
-                                                          write_images=True,
                                                           update_freq=25,
                                                           write_steps_per_second=True)
     checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(filepath=callback_config['model_ckpt'],
