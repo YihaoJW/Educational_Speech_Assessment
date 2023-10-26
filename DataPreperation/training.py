@@ -78,9 +78,6 @@ if __name__ == '__main__':
         with open(config['model_storage']['model_restore'].parent / 'wandb_id.txt', 'w') as f:
             f.write(run_id)
 
-    tfb_path = Path(config['model_storage']['tensorboard_path'])
-    tfb_path.mkdir(parents=True, exist_ok=True)
-    wandb.tensorboard.patch(root_logdir=tfb_path.absolute())
     wandb.init(project="ASR_Model_AttentionBased",
                config=config['model_setting'],
                resume="allow", id=run_id,
