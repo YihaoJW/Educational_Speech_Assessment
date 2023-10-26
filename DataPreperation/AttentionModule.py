@@ -96,7 +96,7 @@ class CrossAttention(BaseAttention):
         attention_mask = self.generate_attention_mask(mask_x, mask_y)
 
         y = self.calculate_attention(x, y, attention_mask)
-        y = self.layer_norm(x)
+        y = self.layer_norm(y)
         # mask of Y is the same as the input mask
         y._keras_mask = mask_y
         return y

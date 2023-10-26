@@ -46,7 +46,8 @@ def build_unet(x, output_shape, channels_list, filter_size, stack_size, dropout_
         x = tf.keras.layers.Conv1DTranspose(channels_list[i], 4, strides=2, padding='valid')(x)
         # x = CutConcatenate(axis=-1)([encoder[i], x])
         if channels_list[i] > 192:
-            x_c = CrossAttention(num_heads=attention_heads, key_dim=channels_list[i], dropout=dropout_rate)([x, encoder[i]])
+            x_c = CrossAttention(num_heads=attention_heads, key_dim=channels_list[i],
+                                 dropout=dropout_rate if dropout_rate > 0 else 0.0)([x, encoder[i]])
             x = tf.keras.layers.Concatenate(axis=-1)([x, x_c])
         else:
             x = CutConcatenate(axis=-1)([encoder[i], x])
@@ -344,8 +345,8 @@ class ASR_Network(tf.keras.Model):
         word_loss_student = self.category_loss(word_reference.flat_values, student_output.flat_values)
         word_loss_reference = self.category_loss(word_reference.flat_values, reference_output.flat_values)
         # Cut avg_word_loss to limited range to avoid crazy value
-        word_loss_student = tf.clip_by_value(word_loss_student, 0.0, 60.0)
-        word_loss_reference = tf.clip_by_value(word_loss_reference, 0.0, 60.0)
+        word_loss_student = tf.clip_by_value(word_loss_student, 0.0, 20.0)
+        word_loss_reference = tf.clip_by_value(word_loss_reference, 0.0, 20.0)
 
         avg_word_loss = tf.reduce_sum((word_loss_student + word_loss_reference) / 2.) / tf.cast(self.batch_counts,
                                                                                                 tf.float32)
