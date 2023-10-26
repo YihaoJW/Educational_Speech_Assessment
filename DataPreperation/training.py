@@ -45,6 +45,8 @@ if __name__ == '__main__':
     parser.add_argument('--gpu_growth', action='store_true', default=False)
     # add name of for current run default is None
     parser.add_argument('--name', type=str, default=None)
+    # add args that if test before training default is False action is store_true
+    parser.add_argument('--test_eval', action='store_true', default=False)
     args = parser.parse_args()
     # load the config
     # with open(args.config, 'r') as f:
@@ -150,8 +152,9 @@ if __name__ == '__main__':
         optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate, amsgrad=True, clipnorm=1.0, clipvalue=0.05)
         network.compile(optimizer=optimizer)
     print("manual debug: network compiled")
-    print("manual debug: test the network")
-    network.evaluate(dst_test)
+    if args.test_eval:
+        print("manual debug: test the network")
+        network.evaluate(dst_test)
     print("manual debug: data pipe set, about to train")
 
     print("manual debug: start training")
