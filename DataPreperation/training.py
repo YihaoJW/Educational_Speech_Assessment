@@ -78,16 +78,20 @@ if __name__ == '__main__':
         with open(config['model_storage']['model_restore'].parent / 'wandb_id.txt', 'w') as f:
             f.write(run_id)
 
+    tfb_path = Path(config['model_storage']['tensorboard_path'])
+    tfb_path.mkdir(parents=True, exist_ok=True)
+
     wandb.init(project="ASR_Model_AttentionBased",
                config=config['model_setting'],
                resume="allow", id=run_id,
-               dir=config['model_storage']['model_restore'].parent)
+               dir=tfb_path,
+               sync_tensorboard=True)
     print("manual debug: Wandb created")
     # create learning rate scheduler
     lr_config = config['training_setting']['learning_rate']
     callback_config = config['model_storage']
     # create callbacks for tensorboard, checkpoint, and restore
-    tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=callback_config['tensorboard_path'],
+    tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=callback_config['tensorboard_path'] / 'tensorboard',
                                                           histogram_freq=5,
                                                           write_graph=False,
                                                           write_images=True,
