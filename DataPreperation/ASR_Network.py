@@ -337,6 +337,9 @@ class ASR_Network(tf.keras.Model):
     def compute_loss_pair(self, inputs, word_reference):
         (student_output, student_deep_feature), (reference_output, reference_deep_feature) = inputs
         # compute the loss for word prediction
+        # Cut value to limited range to avoid crazy value of student_output and reference_output
+        student_output = tf.clip_by_value(student_output, -100.0, 100.0)
+        reference_output = tf.clip_by_value(reference_output, -100.0, 100.0)
         word_loss_student = self.category_loss(word_reference.flat_values, student_output.flat_values)
         word_loss_reference = self.category_loss(word_reference.flat_values, reference_output.flat_values)
         avg_word_loss = tf.reduce_sum((word_loss_student + word_loss_reference) / 2.) / tf.cast(self.batch_counts,
