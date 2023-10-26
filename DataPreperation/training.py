@@ -80,7 +80,9 @@ if __name__ == '__main__':
     wandb.init(project="ASR_Model_AttentionBased",
                config=config['model_setting'],
                resume="allow", id=run_id,
-               dir=config['model_storage']['model_restore'].parent)
+               dir=config['model_storage']['model_restore'].parent,
+               sync_tensorboard=True,
+               )
     print("manual debug: Wandb created")
     # create learning rate scheduler
     lr_config = config['training_setting']['learning_rate']
