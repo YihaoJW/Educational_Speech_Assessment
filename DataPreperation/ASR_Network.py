@@ -7,7 +7,8 @@ def residual_block(x, channels, filter_size, dropout_rate=-1.0, attention_heads=
     x_input = x
     # Self-attention
     if channels > 192:
-        x = SelfAttention(num_heads=attention_heads, key_dim=channels, dropout=dropout_rate)(x)
+        x = SelfAttention(num_heads=attention_heads, key_dim=channels,
+                          dropout=dropout_rate if dropout_rate > 0 else 0.0)(x)
     else:
         x = tf.keras.layers.BatchNormalization()(x)
         x = tf.keras.layers.Activation('relu')(x)
@@ -342,6 +343,10 @@ class ASR_Network(tf.keras.Model):
         reference_output = tf.clip_by_value(reference_output, -15.0, 15.0)
         word_loss_student = self.category_loss(word_reference.flat_values, student_output.flat_values)
         word_loss_reference = self.category_loss(word_reference.flat_values, reference_output.flat_values)
+        # Cut avg_word_loss to limited range to avoid crazy value
+        word_loss_student = tf.clip_by_value(word_loss_student, 0.0, 60.0)
+        word_loss_reference = tf.clip_by_value(word_loss_reference, 0.0, 60.0)
+
         avg_word_loss = tf.reduce_sum((word_loss_student + word_loss_reference) / 2.) / tf.cast(self.batch_counts,
                                                                                                 tf.float32)
         # compute the loss for deep feature
