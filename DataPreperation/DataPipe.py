@@ -1,8 +1,6 @@
 from pathlib import Path
 from typing import Callable, Tuple, Dict, Optional, Any
 import tensorflow as tf
-from tensorflow import Tensor
-from tensorflow.python.data.ops.dataset_ops import DatasetV2
 
 
 class DataPipeFactory:
@@ -303,14 +301,14 @@ class DataPipeFactory:
                        interleave: bool = False,
                        deterministic=False) -> tf.data.Dataset:
         if addition_map is not None:
-            return self.get_raw_data() \
+            return self.get_raw_data().filter(lambda x: tf.shape(x['stu_mfcc'])[0] < 20000) \
                 .apply(self.__pair_map_handle(self.__pairs, deterministic=deterministic, interleave=interleave)) \
                 .apply(self.__batching_handle(batch_size)) \
                 .map(addition_map,
                      num_parallel_calls=tf.data.AUTOTUNE, deterministic=deterministic) \
                 .prefetch(tf.data.AUTOTUNE)
         else:
-            return self.get_raw_data() \
+            return self.get_raw_data().filter(lambda x: tf.shape(x['stu_mfcc'])[0] < 20000) \
                 .apply(self.__pair_map_handle(self.__pairs, deterministic=deterministic, interleave=interleave)) \
                 .apply(self.__batching_handle(batch_size)) \
                 .prefetch(tf.data.AUTOTUNE)

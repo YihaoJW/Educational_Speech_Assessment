@@ -1,4 +1,3 @@
-from yaml import load, dump, safe_load
 import tensorflow as tf
 from ASR_Network import ASR_Network
 from DataPipe import DataPipeFactory
@@ -124,7 +123,7 @@ if __name__ == '__main__':
                                                                            staircase=True)
             network = ASR_Network(**config['model_setting'])
             # create the optimizer
-            optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate, amsgrad=True, clipnorm=2.0, clipvalue=0.5)
+            optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate, amsgrad=True, clipnorm=1.0, clipvalue=0.05)
             network.compile(optimizer=optimizer)
     else:
         # covert all path to string and create the data pipe sample if DataPipeFactory is a class
@@ -148,7 +147,7 @@ if __name__ == '__main__':
                                                                        staircase=True)
         network = ASR_Network(**config['model_setting'])
         # create the optimizer
-        optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+        optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate, amsgrad=True, clipnorm=1.0, clipvalue=0.05)
         network.compile(optimizer=optimizer)
     print("manual debug: network compiled")
     print("manual debug: test the network")
