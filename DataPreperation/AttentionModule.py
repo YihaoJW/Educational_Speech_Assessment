@@ -199,6 +199,14 @@ class SwiGLU(tf.keras.layers.Layer):
         self.dense = tf.keras.layers.Dense(2, use_bias=bias)
         self.supports_masking = True
 
+        def swiGLU(x):
+            out, gate = tf.split(x, num_or_size_splits=2, axis=self.dim)
+            gate = tf.keras.activations.swish(gate)
+            x = tf.multiply(out, gate)
+            return x
+
+        self.swiGLU = tf.recompute_grad(swiGLU)
+
     def compute_mask(self, inputs, mask=None):
         return mask
 
@@ -208,7 +216,5 @@ class SwiGLU(tf.keras.layers.Layer):
         return config
 
     def call(self, x, mask=None, **kwargs):
-        out, gate = tf.split(x, num_or_size_splits=2, axis=self.dim)
-        gate = tf.keras.activations.swish(gate)
-        x = tf.multiply(out, gate)
+        x = self.swiGLU(x)
         return x
