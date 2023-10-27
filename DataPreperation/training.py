@@ -133,7 +133,7 @@ if __name__ == '__main__':
                                                                            staircase=True)
 
             final_lr = tfm.optimization.LinearWarmup(after_warmup_lr_sched=learning_rate,
-                                                     warmup_steps=10000,
+                                                     warmup_steps=3000,
                                                      warmup_learning_rate=0.0)
 
             network = ASR_Network(**config['model_setting'])
