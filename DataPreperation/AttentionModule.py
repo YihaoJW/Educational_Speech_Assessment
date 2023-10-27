@@ -186,3 +186,29 @@ class CutConcatenate(tf.keras.layers.Concatenate):
             y.set_shape(d)
 
         return super().call(inter)
+
+
+class SwiGLU(tf.keras.layers.Layer):
+    def __init__(self, bias=True, dim=-1, **kwargs):
+        """
+        SwiGLU Activation Layer
+        """
+        super(SwiGLU, self).__init__(**kwargs)
+        self.bias = bias
+        self.dim = dim
+        self.dense = tf.keras.layers.Dense(2, use_bias=bias)
+        self.supports_masking = True
+
+    def compute_mask(self, inputs, mask=None):
+        return mask
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({"bias": self.bias, "dim": self.dim})
+        return config
+
+    def call(self, x, mask=None, **kwargs):
+        out, gate = tf.split(x, num_or_size_splits=2, axis=self.dim)
+        gate = tf.keras.activations.swish(gate)
+        x = tf.multiply(out, gate)
+        return x
