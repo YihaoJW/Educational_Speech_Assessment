@@ -11,10 +11,10 @@ def residual_block(x, channels, filter_size, dropout_rate=-1.0, attention_heads=
                           dropout=dropout_rate if dropout_rate > 0 else 0.0)(x)
     else:
         x = tf.keras.layers.LayerNormalization()(x)
-        x = tf.keras.layers.Activation('gelu')(x)
+        x = SwiGLU()(x)
     x = tf.keras.layers.SeparableConv1D(channels, filter_size, padding='same')(x)
     x = tf.keras.layers.LayerNormalization()(x)
-    x = tf.keras.layers.Activation('gelu')(x)
+    x = SwiGLU()(x)
     x = tf.keras.layers.SeparableConv1D(channels, filter_size, padding='same')(x)
     if dropout_rate > 0:
         x = tf.keras.layers.Dropout(dropout_rate)(x)
@@ -70,10 +70,10 @@ def residual_block_fc(x, channels, dropout_rate=-1.):
     x_input = x
     # Residual block start Normalizes, Activates, and Convolution
     x = tf.keras.layers.LayerNormalization()(x)
-    x = tf.keras.layers.Activation('gelu')(x)
+    x = SwiGLU()(x)
     x = tf.keras.layers.Dense(channels)(x)
     x = tf.keras.layers.LayerNormalization()(x)
-    x = tf.keras.layers.Activation('gelu')(x)
+    x = SwiGLU()(x)
     x = tf.keras.layers.Dense(channels)(x)
     if dropout_rate > 0.0:
         x = tf.keras.layers.Dropout(dropout_rate)(x)
