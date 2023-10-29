@@ -197,6 +197,7 @@ if __name__ == '__main__':
         except EmergencyExit as e:
             print(f"EmergencyExit occurred during training: {e}", file=sys.stderr)
             print(f"manual debug: EmergencyExit occurred during training: {e}")
+            wandb.mark_preempting()
             sys.exit(5)
         except Exception as e:
             print(f"Error occurred during training: {e}", file=sys.stderr)
