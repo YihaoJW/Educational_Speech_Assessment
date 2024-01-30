@@ -6,8 +6,6 @@ from pathlib import Path
 from tqdm import tqdm
 
 
-# %%
-
 class Test_DS_Root:
     """
     Base class for test dataset
@@ -29,9 +27,11 @@ class Test_DS_Root:
     @tf.function(jit_compile=True)
     def get_mfcc(pcm: int,
                  sample_rate: int = 16000,
-                 frame_length: int = 1024) -> tf.float32:
-        # Implement the mel-frequency coefficients (MFC) from a raw audio signal.
-        pcm = tf.cast(pcm, tf.float32) / tf.int16.max
+                 frame_length: int = 1024,
+                 is_float=False) -> tf.float32:
+        # Implement the mel-frequency coefficients (MFC) from a raw audio signal
+        if not is_float:
+            pcm = tf.cast(pcm, tf.float32) / tf.int16.max
         st_fft = tf.signal.stft(pcm, frame_length=frame_length, frame_step=frame_length // 8, fft_length=frame_length)
         spectrograms = tf.abs(st_fft)
         # Warp the linear scale spectrograms into the mel-scale.
@@ -93,12 +93,17 @@ class Test_DS_Factory_Siri(Test_DS_Root):
 
         return passage_id_ds.map(name_to_files_mapper, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
+    @staticmethod
+    def mask_correct(frame, passage_id, fix):
+        value_f = frame[0]
+        value_f = tf.where(tf.equal(value_f, -13.815510749816895), -1., value_f)
+        return (value_f, frame[1]), passage_id, fix
+
     def get_final_ds(self):
         return self.get_raw_ds().map(lambda x, y, z:
-                                     (
-                                         (self.get_mfcc(x), self.unpack(y)
-                                          ), z, 'Siri'),
-                                     num_parallel_calls=tf.data.experimental.AUTOTUNE).prefetch(
+                                     ((self.get_mfcc(x), self.unpack(y)), z, 'Siri'),
+                                     num_parallel_calls=tf.data.experimental.AUTOTUNE).map(
+            self.mask_correct, num_parallel_calls=tf.data.experimental.AUTOTUNE).prefetch(
             tf.data.experimental.AUTOTUNE)
 
 
@@ -167,3 +172,53 @@ class Test_DS_Factory_Student(Test_DS_Root):
                                      ),
                                      num_parallel_calls=tf.data.experimental.AUTOTUNE).prefetch(
             tf.data.experimental.AUTOTUNE)
+
+
+class Prosody_Data_Generation(Test_DS_Root):
+    """
+    Read a path of file that contain wav files,
+    and it need to return mfcc of that wav file, mask of wav file, and name of the file
+    """
+
+    def __init__(self, audios_wav_path: str):
+        self.audio_wav_path = Path(audios_wav_path)
+        # secure check
+        if not self.audio_wav_path.exists():
+            raise FileNotFoundError(f"Audio wav path {self.audio_wav_path} is not existed")
+
+    def get_raw_ds(self):
+        """
+        get the raw dataset
+        Read voice_frame and get the passage_id in its filename and use it to read the label file, return frame, label, and passage_id
+        frame and label has the same batch shape which is num_of_speakers; we can assume it's will match up
+        """
+        # get all the wav files in the folder using tensorflow dataset
+        wav_files = tf.data.Dataset.list_files(str(self.audio_wav_path / '*.wav'))
+        # return raw dataset with the wav file name
+        return wav_files
+
+    @staticmethod
+    def parse_function(file_name: tf.string) -> Dict:
+        """
+        Read the wav file and return the mfcc and mask of that wav file
+        """
+        # read the wav file
+        audio = tf.io.read_file(file_name)
+        # decode the wav file
+        audio, sample_rate = tf.audio.decode_wav(audio)
+        # get the mfcc of the wav file on the single channel
+        mfcc = Prosody_Data_Generation.get_mfcc(audio[:, 0], sample_rate, is_float=True)
+        # get the mask of the single channel wav file is a 1d array with value 1.0
+        mask = tf.ones_like(mfcc[:, 0])
+        # get the file name
+        file_name = tf.strings.split(tf.strings.split(file_name, '/')[-1], '.')[0]
+        # return the mfcc, mask, and file name
+        return {'mfcc': mfcc, 'mask': mask, 'file_name': file_name}
+
+    def get_final_ds(self, batch_size=16):
+        """
+        get the final dataset with batch size batch_size, make sure mfcc and mask is padded to the same length with value -1 and 0
+        """
+        return self.get_raw_ds().map(self.parse_function, num_parallel_calls=tf.data.experimental.AUTOTUNE).padded_batch(
+            batch_size, padded_shapes={'mfcc': [-1, -1], 'mask': [-1], 'file_name': []}, padding_values={
+                'mfcc': -1., 'mask': 0., 'file_name': ''}).prefetch(tf.data.experimental.AUTOTUNE)
