@@ -176,7 +176,7 @@ class Test_DS_Factory_Student(Test_DS_Root):
 
 class Prosody_Data_Generation(Test_DS_Root):
     """
-    Read a path of file that contain wav files,
+    Read a path of file that contain mfcc tfs files,
     and it need to return mfcc of that wav file, mask of wav file, and name of the file
     """
 
@@ -193,22 +193,19 @@ class Prosody_Data_Generation(Test_DS_Root):
         frame and label has the same batch shape which is num_of_speakers; we can assume it's will match up
         """
         # get all the wav files in the folder using tensorflow dataset
-        wav_files = tf.data.Dataset.list_files(str(self.audio_wav_path / '*.wav'))
+        wav_files = tf.data.Dataset.list_files(str(self.audio_wav_path / '*.tfs'))
         # return raw dataset with the wav file name
         return wav_files
 
     @staticmethod
     def parse_function(file_name: tf.string) -> Dict:
         """
-        Read the wav file and return the mfcc and mask of that wav file
+        Read the tfs which is already in mfcc and return the mfcc and mask of that wav file
         """
-        # read the wav file
-        audio = tf.io.read_file(file_name)
-        # decode the wav file
-        audio, sample_rate = tf.audio.decode_wav(audio)
-        # get the mfcc of the wav file on the single channel
-        mfcc = Prosody_Data_Generation.get_mfcc(audio[:, 0], sample_rate, is_float=True)
-        # get the mask of the single channel wav file is a 1d array with value 1.0
+        # read the tfs file
+        mfcc = tf.io.read_file(file_name)
+        # parse the tfs file
+        mfcc = tf.io.parse_tensor(mfcc, tf.float32)
         mask = tf.ones_like(mfcc[:, 0])
         # get the file name
         file_name = tf.strings.split(tf.strings.split(file_name, '/')[-1], '.')[0]

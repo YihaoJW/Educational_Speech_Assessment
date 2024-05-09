@@ -226,10 +226,13 @@ class ASR_Network(tf.keras.Model):
                             stack_size,
                             dropout_rate=-1.0,
                             attention_heads=2):
+
         x = tf.keras.Input(input_shape)
-        x = tf.keras.layers.Masking(mask_value=-1.0)(x)
-        x = RotaryEmbeddingMask()(x)
-        y, maps = build_unet(x, feature_depth, channels_list, filter_size, stack_size,
+        y = tf.keras.layers.Masking(mask_value=-1.0)(x)
+        # create a feature embedding transformer by 1D Conv before positional encoding
+        y = tf.keras.layers.Conv1D(channels_list[0], filter_size, padding='same')(y)
+        y = RotaryEmbeddingMask()(y)
+        y, maps = build_unet(y, feature_depth, channels_list, filter_size, stack_size,
                              dropout_rate=dropout_rate,
                              attention_heads=attention_heads)
         return tf.keras.Model(x, [y, maps])

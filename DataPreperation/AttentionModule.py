@@ -3,8 +3,20 @@ import keras_nlp
 
 
 class RotaryEmbeddingMask(keras_nlp.layers.RotaryEmbedding):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.supports_masking = True
+
     def compute_mask(self, inputs, mask=None):
         return mask
+
+    def call(self, inputs, training=None, mask=None, **kwargs):
+        ret = super().call(inputs, **kwargs)
+        # Apply the mask to the output
+        if mask is not None:
+            ret._keras_mask = mask
+        return ret
 
 
 class BaseAttention(tf.keras.layers.Layer):
@@ -17,6 +29,7 @@ class BaseAttention(tf.keras.layers.Layer):
         self.mha = tf.keras.layers.MultiHeadAttention(**kwargs)
         self.layer_norm = tf.keras.layers.LayerNormalization()
         self.add = tf.keras.layers.Add()
+        self.supports_masking = True
 
         def calculate_attention(x, y, mask):
             # if tf.get_static_value(tf.rank(mask)) == 0:
@@ -37,38 +50,45 @@ class BaseAttention(tf.keras.layers.Layer):
         config = super().get_config()
         config.update({"mha": self.mha.get_config(),
                        "layer_norm": self.layer_norm.get_config(),
-                       "add": self.add.get_config()})
+                       "add": self.add.get_config(),
+                       "supports_masking": self.supports_masking})
         return config
 
     @staticmethod
     def generate_attention_mask(mask_x, mask_y):
-        """Generate the cross-attention mask.
+        """Generate the cross-attention mask considering both mask_x and mask_y, with correct broadcasting for non-None masks.
 
         Args:
-            mask_x: Mask for the query, could be None.
-            mask_y: Mask for the key, could be None.
+            mask_x: Mask for the query, shape [B, T], or None.
+            mask_y: Mask for the key, shape [B, S], or None.
 
         Returns:
-            A Tensor representing the cross attention mask, or None if both mask_x and mask_y are None.
+            A boolean Tensor representing the cross-attention mask with shape [B, T, S].
         """
+        # Handle mask_x
+        if mask_x is None:
+            mask_x = tf.ones([1, 1, 1], dtype=tf.bool)  # Full attention if mask_x is missing
+        else:
+            mask_x = tf.cast(mask_x[:, :, tf.newaxis], dtype=tf.bool)  # Shape [B, T, 1]
 
-        # If mask_y (key mask) is None, return all True attention mask
+        # Handle mask_y
         if mask_y is None:
-            return tf.ones([1, 1, 1])
+            mask_y = tf.ones([1, 1, 1], dtype=tf.bool)  # Full attention if mask_y is missing
+        else:
+            mask_y = tf.cast(mask_y[:, tf.newaxis, :], dtype=tf.bool)  # Shape [B, 1, S]
 
-        # Only expand dimensions of mask_y for keys, as we only want to mask the keys
-        return tf.expand_dims(mask_y, 1)
+        # Generate the combined mask with correct broadcasting, resulting in shape [B, T, S]
+        combined_mask = tf.cast(tf.logical_and(mask_x, mask_y), dtype=tf.float32)
 
-    def compute_mask(self, inputs, mask=None):
-        # Just pass the received mask from the previous layer to the next layer or
-        # manipulate it if this layer changes the shape of the input
-        return mask
+        return combined_mask
 
 
 class SelfAttention(BaseAttention):
     """
     A self-attention layer, that using gradient check point to save memory
     """
+    def compute_mask(self, inputs, mask=None):
+        return mask
 
     @tf.function
     def call(self, inputs, training=None, mask=None):
@@ -79,12 +99,14 @@ class SelfAttention(BaseAttention):
         attention_mask = self.generate_attention_mask(mask, mask)
         x = self.calculate_attention(x, x, attention_mask)
         x = self.layer_norm(x)
-        # mask of X is the same as the input mask
-        x._keras_mask = mask
         return x
 
 
 class CrossAttention(BaseAttention):
+
+    def compute_mask(self, inputs, mask=None):
+        mask_x, mask_y = mask if mask is not None else (None, None)
+        return mask_x
 
     @tf.function
     def call(self, inputs, training=None, mask=None):
@@ -97,8 +119,6 @@ class CrossAttention(BaseAttention):
 
         y = self.calculate_attention(x, y, attention_mask)
         y = self.layer_norm(y)
-        # mask of Y is the same as the input mask
-        y._keras_mask = mask_y
         return y
 
 

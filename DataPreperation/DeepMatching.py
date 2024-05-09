@@ -9,6 +9,8 @@ from sklearn.utils import resample
 import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+from mpl_toolkits.axes_grid1.inset_locator import mark_inset
 
 
 def read_siri_feature_and_label(passage_id: int,
@@ -352,14 +354,27 @@ all_unmatch_score = np.concatenate(list_of_unmatch)
 # Draw a histogram of the distribution of similarity score in matched word and unmatched word
 # do not draw line of the histogram it's too much
 fig, ax = plt.subplots(figsize=(7, 5))
-sns.histplot(data=all_match_score, label='Matched Word', binwidth=0.02, kde=True, stat='density', ax=ax)
-sns.histplot(data=all_unmatch_score, label='Unmatched Word', binwidth=0.02, kde=True, stat='density', ax=ax)
+bin_edges = np.arange(min(np.min(all_match_score), np.min(all_unmatch_score)),
+                      max(np.max(all_match_score), np.max(all_unmatch_score)),
+                      0.02)  # bin width
+
+sns.histplot(data=all_unmatch_score, label='Unmatched Word', bins=bin_edges, kde=True, stat='density', ax=ax)
+sns.histplot(data=all_match_score, label='Matched Word', bins=bin_edges, kde=True, stat='density', ax=ax)
 ax.legend()
-fig.suptitle('Normalized Histogram of Cosine Similarity', fontsize=14, fontweight='bold')
-fig.savefig('../compare_distrubution.pdf', format='pdf', dpi=300)
+fig.suptitle('Histogram (Density) of Cosine Similarity for Match/UnMatch', fontsize=14, fontweight='bold')
+fig.savefig('../full_result_compare_hist_Cosine.pdf', format='pdf', dpi=300)
+plt.show()
+# Combined histogram, Combine all_match_score and all_unmatch_score into a histogram
+fig, ax = plt.subplots(figsize=(7, 5))
+sns.histplot(data=np.concatenate([all_match_score, all_unmatch_score], axis=0), bins=bin_edges, kde=True, stat='density', ax=ax)
+fig.suptitle('Histogram (Density) of Cosine Similarity', fontsize=14, fontweight='bold')
+fig.savefig('../full_result_combined_hist_Cosine.pdf', format='pdf', dpi=300)
+plt.show()
+
 # %%
 # Test Cell
-case_id = 'student_982_passage_34000_553fe870c3878'
+# case_id = 'student_982_passage_34000_553fe870c3878'
+case_id = "student_894_passage_34000_55523fdeb4737"
 siri_deep_feature_prefix = Path(f"../DataFolder/Siri_Related/{model_name}")
 word_tagging_prefix = Path("../DataFolder/Siri_Related/SiriR")
 single_result = search_dir / f'{case_id}.npy'
@@ -414,12 +429,31 @@ unmatched_score = ori.reshape(-1)
 unmatched_score = unmatched_score[unmatched_score != -1]
 # remove matched_score from unmatched_score
 unmatched_score = unmatched_score[~np.isin(unmatched_score, matched_score)]
+
 # plot use seaborn
-# the number of matched word and unmatched word are very different, so we need to normalize the histogram
-# use density=True to normalize the histogram
-sns.histplot(data=matched_score, label='Matched Word', binwidth=0.02, kde=True, stat='density')
-sns.histplot(data=unmatched_score, label='Unmatched Word', binwidth=0.02, kde=True, stat='density')
-plt.legend()
+# Define the bin edges
+bin_edges = np.arange(min(np.min(matched_score), np.min(unmatched_score)),
+                      max(np.max(matched_score), np.max(unmatched_score)),
+                      0.02)  # bin width
+
+# Plot the histograms using the defined bin edges
+fig, ax = plt.subplots(figsize=(7, 5))
+sns.histplot(data=unmatched_score, label='Unmatched Word', bins=bin_edges, kde=True, stat='count', ax=ax)
+sns.histplot(data=matched_score, label='Matched Word', bins=bin_edges, kde=True, stat='count', ax=ax)
+ax.legend()
+fig.suptitle('Histogram (Density) of Cosine Similarity on Single Case', fontsize=14, fontweight='bold')
+# Need overlay Zoom in View on (x: 0.25~ 1.0, y: 0 ~ 50)
+axins = inset_axes(ax, width="40%", height="20%", bbox_to_anchor=(-0.45, 0.6, 1, 1), loc=4, bbox_transform=ax.transAxes)
+
+zoom_xlim = (0.35, 1.0)
+zoom_ylim = (0, 60)
+axins.set_xlim(*zoom_xlim)
+axins.set_ylim(*zoom_ylim)
+mark_inset(ax, axins, loc1=1, loc2=3, fc="none", ec="0")
+sns.histplot(data=unmatched_score, bins=bin_edges, kde=True, stat='count', ax=axins)
+sns.histplot(data=matched_score, bins=bin_edges, kde=True, stat='count', ax=axins, color='orange')
+
+fig.savefig('../single_result_compare_hist_Cosine.pdf', format='pdf', dpi=300)
 plt.show()
 
 # %%
@@ -430,12 +464,23 @@ peaks, _ = find_peaks(hist, distance=10)
 sorted_peaks = sorted(peaks, key=lambda x: -hist[x])
 top_two_peak_values = bin_centers[sorted_peaks[:2]]
 print("Top two peak values:", top_two_peak_values)
+fig, ax = plt.subplots(figsize=(7, 5))
+sns.histplot(data=ori.reshape(-1), bins=bins_count, kde=True, ax=ax)
 
-sns.histplot(data=ori.reshape(-1), bins=bins_count, kde=True)
-plt.plot(bin_centers, hist, label="Histogram")
 # plt.plot(bin_centers[sorted_peaks[:2]], hist[sorted_peaks[:2]], "ro", label="Top 2 peaks")
 plt.axvline(top_two_peak_values[0], color='r', linestyle='--', label='Peak 1')
 plt.axvline(top_two_peak_values[1], color='r', linestyle='--', label='Peak 2')
+# Add a horizontal line to show the distance between the two peaks, start from the first peak and end at the second
+# peak with a small bidirectional arrow.
+# The vertical position of the line is at and mid of the histogram (read from y legend)
+y_h = hist.max() * 0.9
+plt.annotate('', xy=(top_two_peak_values[0], y_h), xytext=(top_two_peak_values[1], y_h),
+             arrowprops=dict(arrowstyle='<->', color='r', linestyle='--'))
+# Add text annotation
+mid_point = (top_two_peak_values[0] + top_two_peak_values[1]) / 2
+plt.text(mid_point, y_h, f'Distance {abs(top_two_peak_values[0] - top_two_peak_values[1]):.2f}', ha='center', va='bottom', color='black')
+plt.suptitle('Histogram (Density) of Cosine Similarity on Single Case', fontsize=14, fontweight='bold')
 plt.legend()
+plt.savefig('../single_result_hist_Cosine.pdf', format='pdf', dpi=300)
 plt.show()
 # %%
