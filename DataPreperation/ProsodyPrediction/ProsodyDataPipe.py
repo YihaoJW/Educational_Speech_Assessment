@@ -61,11 +61,18 @@ class ProsodyDataPipeFactory:
         Return the main tf.data.Dataset object
         """
         if self.eval_mode:
-            return (self.get_raw().map(self.map_function_generator(ret_filename=self.ret_filename), num_parallel_calls=tf.data.AUTOTUNE)
-                    .padded_batch(self.batch_size, padding_values=((-1.0, (-1.0, -1.0, -1.0, -1.0)), -1.0),
-                                  padded_shapes=(([None, 128],
-                                                  ([None, 128], [None, 128], [None, 128], [None, 128])), [3]), drop_remainder=False)
-                    .prefetch(tf.data.AUTOTUNE))
+            if not self.ret_filename:
+                return (self.get_raw().map(self.map_function_generator())
+                        .padded_batch(self.batch_size, padding_values=((-1.0, (-1.0, -1.0, -1.0, -1.0)), -1.0),
+                                      padded_shapes=(([None, 128],
+                                                      ([None, 128], [None, 128], [None, 128], [None, 128])), [3]), drop_remainder=False)
+                        .prefetch(tf.data.AUTOTUNE))
+            else:
+                return (self.get_raw().map(self.map_function_generator(ret_filename=True))
+                        .padded_batch(self.batch_size, padding_values=((-1.0, (-1.0, -1.0, -1.0, -1.0)), -1.0, ""),
+                                      padded_shapes=(([None, 128],
+                                                      ([None, 128], [None, 128], [None, 128], [None, 128])), [3], [None]), drop_remainder=False)
+                        .prefetch(tf.data.AUTOTUNE))
         else:
             return (self.get_raw().shuffle(5000)
                     .map(self.map_function_generator(), num_parallel_calls=tf.data.AUTOTUNE)
