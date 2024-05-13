@@ -15,7 +15,8 @@ class ProsodyDataPipeFactory:
                  siri_folder: Path,
                  score_record: Path,
                  batch_size: int,
-                 eval_mode: bool = False):
+                 eval_mode: bool = False,
+                 ret_filename: bool = False):
         """
         Initialize the factory and verify the folder and file are all exist folder are all Path object
         """
@@ -37,6 +38,7 @@ class ProsodyDataPipeFactory:
         self.__dataset = tf.data.TFRecordDataset([self.score_record])
         self.eval_mode = eval_mode
         self.__raw_data = None
+        self.ret_filename = ret_filename
 
     def __parse_function(self):
         # Parse the input tf.Example proto using the dictionary above.
@@ -59,7 +61,7 @@ class ProsodyDataPipeFactory:
         Return the main tf.data.Dataset object
         """
         if self.eval_mode:
-            return (self.get_raw().map(self.map_function_generator(), num_parallel_calls=tf.data.AUTOTUNE)
+            return (self.get_raw().map(self.map_function_generator(ret_filename=self.ret_filename), num_parallel_calls=tf.data.AUTOTUNE)
                     .padded_batch(self.batch_size, padding_values=((-1.0, (-1.0, -1.0, -1.0, -1.0)), -1.0),
                                   padded_shapes=(([None, 128],
                                                   ([None, 128], [None, 128], [None, 128], [None, 128])), [3]), drop_remainder=False)
@@ -72,7 +74,7 @@ class ProsodyDataPipeFactory:
                                                   ([None, 128], [None, 128], [None, 128], [None, 128])), [3]), drop_remainder=True)
                     .prefetch(tf.data.AUTOTUNE))
 
-    def map_function_generator(self):
+    def map_function_generator(self, ret_filename=False):
         """
         A function to map the tf.data.Dataset object to the final form
         """
@@ -105,7 +107,9 @@ class ProsodyDataPipeFactory:
             siri = tf.io.parse_tensor(tf.io.read_file(siri_path), out_type=tf.float32)
             # Mix rating rating_max and rating_min into a single tensor using tf.stack
             total_rating = tf.stack([rating, rating_min, rating_max])
-
-            return (rp(student), (rp(siri[0]), rp(siri[1]), rp(siri[2]), rp(siri[3]))), total_rating
+            if not ret_filename:
+                return (rp(student), (rp(siri[0]), rp(siri[1]), rp(siri[2]), rp(siri[3]))), total_rating
+            else:
+                return (rp(student), (rp(siri[0]), rp(siri[1]), rp(siri[2]), rp(siri[3]))), total_rating, filename
 
         return mapping

@@ -56,7 +56,7 @@ if __name__ == "__main__":
     print("manual debug: Callbacks created")
 
     train_factory = ProsodyDataPipeFactory(student_folder, siri_folder, train_record, config["training_setting"]["batch_size"],eval_mode=False)
-    eval_factory = ProsodyDataPipeFactory(student_folder, siri_folder, eval_record, 8, eval_mode=True)
+    eval_factory = ProsodyDataPipeFactory(student_folder, siri_folder, eval_record, 8, eval_mode=True, ret_filename=True)
     dst = train_factory.get_main_dataset()
     dse = eval_factory.get_main_dataset()
 
@@ -83,19 +83,23 @@ if __name__ == "__main__":
     # Save Y_pred and Y_true into csv
     y_pred_list = []
     y_true_list = []
+    filename_list = []
 
-    for x, y in dse:
+    for x, y, z in dse:
         y_pred = model.predict(x)
         y_pred_list.append(y_pred)
         y_true_list.append(y)
+        filename_list.append(z)
 
     y_pred = tf.concat(y_pred_list, axis=0)
     y_pred = tf.cast(tf.argmax(y_pred, axis=-1), tf.float32)
     y_true = tf.concat(y_true_list, axis=0)
+    z = tf.concat(filename_list, axis=0)
     y_full = tf.concat([y_true, y_pred[..., tf.newaxis]], axis=-1)
     full_df = pd.DataFrame(
         y_full.numpy(),
         columns=['rating', 'rating_min', 'rating_max','rating_pred']
     )
-
+    # Add filename to the dataframe need decode the byte string
+    full_df['filename'] = [x.decode() for x in z.numpy()]
     full_df.to_csv(callback_config['model_restore'].parent / 'evaluation_result.csv', index=True)
