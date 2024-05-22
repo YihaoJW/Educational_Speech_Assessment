@@ -12,7 +12,6 @@ from yaml import safe_load
 import tensorflow_models as tfm
 import pandas as pd
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train the prosody prediction model")
     # Accpet a yaml file for the configuration
@@ -52,8 +51,10 @@ if __name__ == "__main__":
                                                           delete_checkpoint=False)
     print("manual debug: Callbacks created")
 
-    train_factory = ProsodyDataPipeFactory(student_folder, siri_folder, train_record, config["training_setting"]["batch_size"],eval_mode=False)
-    eval_factory = ProsodyDataPipeFactory(student_folder, siri_folder, eval_record, 8, eval_mode=True, ret_filename=True)
+    train_factory = ProsodyDataPipeFactory(student_folder, siri_folder, train_record,
+                                           config["training_setting"]["batch_size"], eval_mode=False)
+    eval_factory = ProsodyDataPipeFactory(student_folder, siri_folder, eval_record, 8, eval_mode=True,
+                                          ret_filename=True)
     dst = train_factory.get_main_dataset()
     dse = eval_factory.get_main_dataset()
 
@@ -66,7 +67,7 @@ if __name__ == "__main__":
                                              warmup_steps=150,
                                              warmup_learning_rate=0.0)
 
-    optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule, amsgrad=True, clipnorm=1.0,clipvalue=0.05)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule, amsgrad=True, clipnorm=1.0, clipvalue=0.05)
     # GPU_COUNT = strategy.num_replicas_in_sync
     model = ProsodyNetwork(**config['model_setting'])
     model.compile(optimizer=optimizer,
@@ -89,7 +90,9 @@ if __name__ == "__main__":
         filename_list.append(z)
 
     y_pred = tf.concat(y_pred_list, axis=0)
-    y_pred_prob_max = tf.reduce_max(y_pred, axis=-1)
+    # Softmax the output to get probability
+    y_pred_prob = tf.nn.softmax(y_pred, axis=-1)
+    y_pred_prob_max = tf.reduce_max(y_pred_prob, axis=-1)
     y_pred_arg = tf.cast(tf.argmax(y_pred, axis=-1), tf.float32)
     y_true = tf.concat(y_true_list, axis=0)
     z = tf.concat(filename_list, axis=0)
