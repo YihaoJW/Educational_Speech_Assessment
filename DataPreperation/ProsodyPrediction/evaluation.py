@@ -5,13 +5,10 @@ sys.path.append('..')
 import tensorflow as tf
 from pathlib import Path
 import argparse
-import wandb
-from wandb.keras import WandbMetricsLogger
 from ProsodyDataPipe import ProsodyDataPipeFactory
 from ProsodyPrediction.ProsodyNetwork import ProsodyNetwork
-from ProsodyPrediction.ProsodyMetrics import ProsodyLoss, AbsoluteAccuracy, RatingAccuracy, WithInRangeAccuracy, RatingAccuracyDirect, WithInRangeAccuracyDirect, ProsodyKappaLoss
+from ProsodyPrediction.ProsodyMetrics import ProsodyLoss
 from yaml import safe_load
-from util_function import EmergencyExitCallback, EmergencyExit
 import tensorflow_models as tfm
 import pandas as pd
 
@@ -93,12 +90,13 @@ if __name__ == "__main__":
 
     y_pred = tf.concat(y_pred_list, axis=0)
     y_pred = tf.cast(tf.argmax(y_pred, axis=-1), tf.float32)
+    y_pred_prob_max = tf.reduce_max(y_pred, axis=-1)
     y_true = tf.concat(y_true_list, axis=0)
     z = tf.concat(filename_list, axis=0)
-    y_full = tf.concat([y_true, y_pred[..., tf.newaxis]], axis=-1)
+    y_full = tf.concat([y_true, y_pred[..., tf.newaxis], y_pred_prob_max[..., tf.newaxis]], axis=-1)
     full_df = pd.DataFrame(
         y_full.numpy(),
-        columns=['rating', 'rating_min', 'rating_max','rating_pred']
+        columns=['rating', 'rating_min', 'rating_max', 'rating_pred', 'rating_prob_max']
     )
     # Add filename to the dataframe need decode the byte string
     full_df['filename'] = [x.decode() for x in z.numpy()]
