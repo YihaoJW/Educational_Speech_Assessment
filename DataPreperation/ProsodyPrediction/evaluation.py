@@ -89,11 +89,11 @@ if __name__ == "__main__":
         filename_list.append(z)
 
     y_pred = tf.concat(y_pred_list, axis=0)
-    y_pred = tf.cast(tf.argmax(y_pred, axis=-1), tf.float32)
     y_pred_prob_max = tf.reduce_max(y_pred, axis=-1)
+    y_pred_arg = tf.cast(tf.argmax(y_pred, axis=-1), tf.float32)
     y_true = tf.concat(y_true_list, axis=0)
     z = tf.concat(filename_list, axis=0)
-    y_full = tf.concat([y_true, y_pred[..., tf.newaxis], y_pred_prob_max[..., tf.newaxis]], axis=-1)
+    y_full = tf.concat([y_true, y_pred_arg[..., tf.newaxis], y_pred_prob_max[..., tf.newaxis]], axis=-1)
     full_df = pd.DataFrame(
         y_full.numpy(),
         columns=['rating', 'rating_min', 'rating_max', 'rating_pred', 'rating_prob_max']
